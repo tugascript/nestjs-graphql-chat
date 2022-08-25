@@ -8,25 +8,24 @@ import {
 } from '@nestjs/graphql';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
-import { LocalMessageType } from '../common/gql-types/message.type';
+import { SearchDto } from '../common/dtos/search.dto';
+import { LocalMessageType } from '../common/entities/gql/message.type';
 import { IPaginated } from '../common/interfaces/paginated.interface';
 import { GetUserDto } from './dtos/get-user.dto';
 import { OnlineStatusDto } from './dtos/online-status.dto';
 import { ProfilePictureDto } from './dtos/profile-picture.dto';
-import { UserEntity } from './entities/user.entity';
-import { PaginatedUsersType } from './gql-types/paginated-users.type';
-import { UserType } from './gql-types/user.type';
-import { UsersService } from './users.service';
-import { SearchDto } from '../common/dtos/search.dto';
 import { UserDto } from './dtos/user.dto';
+import { PaginatedUsersType } from './entities/gql/paginated-users.type';
+import { UserEntity } from './entities/user.entity';
+import { UsersService } from './users.service';
 
-@Resolver(() => UserType)
+@Resolver(() => UserEntity)
 export class UsersResolver {
   constructor(private readonly usersService: UsersService) {}
 
   //____________________ MUTATIONS ____________________
 
-  @Mutation(() => UserType)
+  @Mutation(() => UserEntity)
   public async updateProfilePicture(
     @CurrentUser() userId: number,
     @Args() dto: ProfilePictureDto,
@@ -52,7 +51,7 @@ export class UsersResolver {
 
   //____________________ QUERIES ____________________
 
-  @Query(() => UserType)
+  @Query(() => UserEntity)
   public async me(@CurrentUser() userId: number): Promise<UserEntity> {
     return this.usersService.userById(userId);
   }
@@ -60,13 +59,13 @@ export class UsersResolver {
   //____________________ PUBLIC QUERIES ____________________
 
   @Public()
-  @Query(() => UserType)
+  @Query(() => UserEntity)
   public async userByUsername(@Args() dto: GetUserDto): Promise<UserEntity> {
     return this.usersService.userByUsername(dto.username);
   }
 
   @Public()
-  @Query(() => UserType)
+  @Query(() => UserEntity)
   public async userById(@Args() dto: UserDto): Promise<UserEntity> {
     return this.usersService.userById(dto.userId);
   }

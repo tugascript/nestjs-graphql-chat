@@ -11,7 +11,7 @@ registerEnumType(QueryCursorEnum, {
 });
 
 export const getQueryCursor = (cursor: QueryCursorEnum): string =>
-  cursor === QueryCursorEnum.DATE ? 'id' : 'slug';
+  cursor === QueryCursorEnum.DATE ? 'createdAt' : 'slug';
 
 export const getUserQueryCursor = (cursor: QueryCursorEnum): keyof IUser =>
   cursor === QueryCursorEnum.DATE ? 'id' : 'username';

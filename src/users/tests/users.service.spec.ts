@@ -8,18 +8,18 @@ import { hash } from 'bcrypt';
 import { RegisterDto } from '../../auth/dtos/register.dto';
 import { CommonModule } from '../../common/common.module';
 import { CommonService } from '../../common/common.service';
-import { QueryOrderEnum } from '../../common/enums/query-order.enum';
-import { LocalMessageType } from '../../common/gql-types/message.type';
-import { config } from '../../config/config';
-import { MikroOrmConfig } from '../../config/mikroorm.config';
-import { validationSchema } from '../../config/validation';
-import { UploaderModule } from '../../uploader/uploader.module';
-import { UsersService } from '../users.service';
-import { UserEntity } from '../entities/user.entity';
+import { LocalMessageType } from '../../common/entities/gql/message.type';
 import {
   getUserQueryCursor,
   QueryCursorEnum,
 } from '../../common/enums/query-cursor.enum';
+import { QueryOrderEnum } from '../../common/enums/query-order.enum';
+import { config } from '../../config/config';
+import { MikroOrmConfig } from '../../config/mikroorm.config';
+import { validationSchema } from '../../config/validation';
+import { UploaderModule } from '../../uploader/uploader.module';
+import { UserEntity } from '../entities/user.entity';
+import { UsersService } from '../users.service';
 
 const PASSWORD = 'Ab123456';
 

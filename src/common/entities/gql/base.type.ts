@@ -1,5 +1,5 @@
 import { Field, Int, ObjectType } from '@nestjs/graphql';
-import { IBase } from '../interfaces/base.interface';
+import { IBase } from '../../interfaces/base.interface';
 
 @ObjectType({ isAbstract: true })
 export abstract class LocalBaseType implements IBase {

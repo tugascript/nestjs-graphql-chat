@@ -8,8 +8,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { validate } from 'class-validator';
+import { Repository } from 'redis-om';
 import slugify from 'slugify';
 import { v4 as uuidV4 } from 'uuid';
+import { RedisBaseEntity } from './entities/redis-base.entity';
 import { NotificationTypeEnum } from './enums/notification-type.enum';
 import {
   getOppositeOrder,
@@ -347,6 +349,14 @@ export class CommonService {
     if (isNew) repo.persist(entity);
 
     await this.throwDuplicateError(repo.flush());
+  }
+
+  public async saveRedisEntity<T extends RedisBaseEntity>(
+    repo: Repository<T>,
+    entity: T,
+  ): Promise<void> {
+    await this.validateEntity(entity);
+    await this.throwInternalError(repo.save(entity));
   }
 
   /**

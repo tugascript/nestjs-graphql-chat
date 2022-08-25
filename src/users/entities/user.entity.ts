@@ -6,14 +6,13 @@ import {
   OptionalProps,
   Property,
 } from '@mikro-orm/core';
+import { Field, GraphQLTimestamp, ObjectType } from '@nestjs/graphql';
 import {
   IsBoolean,
   IsDate,
   IsEmail,
   IsEnum,
-  IsOptional,
   IsString,
-  IsUrl,
   Length,
   Matches,
 } from 'class-validator';
@@ -27,7 +26,8 @@ import { CredentialsEmbeddable } from '../embeddables/credentials.embeddable';
 import { OnlineStatusEnum } from '../enums/online-status.enum';
 import { IUser } from '../interfaces/user.interface';
 
-@Entity({ tableName: 'users' })
+@ObjectType('User')
+@Entity()
 export class UserEntity extends LocalBaseEntity implements IUser {
   [OptionalProps]?:
     | 'id'
@@ -43,33 +43,32 @@ export class UserEntity extends LocalBaseEntity implements IUser {
     | 'lastLogin'
     | 'lastOnline';
 
-  @Property({ columnType: 'varchar(100)' })
+  @Field(() => String)
+  @Property()
   @IsString()
   @Length(3, 100)
   @Matches(NAME_REGEX)
   public name!: string;
 
-  @Property({ columnType: 'varchar(110)', unique: true })
+  @Field(() => String)
+  @Property()
   @IsString()
   @Length(3, 110)
   @Matches(SLUG_REGEX)
   public username!: string;
 
-  @Property({ columnType: 'varchar(255)', unique: true })
+  @Field(() => String, { nullable: true })
+  @Property()
   @IsEmail()
   public email!: string;
 
-  @Property({ columnType: 'varchar(255)', nullable: true })
-  @IsOptional()
-  @IsUrl()
-  public picture?: string;
-
-  @Property({ columnType: 'varchar(60)' })
+  @Property()
   @IsString()
   @Length(59, 60)
   @Matches(BCRYPT_HASH)
   public password!: string;
 
+  @Field(() => OnlineStatusEnum)
   @Enum({
     items: () => OnlineStatusEnum,
     default: OnlineStatusEnum.OFFLINE,
@@ -78,6 +77,7 @@ export class UserEntity extends LocalBaseEntity implements IUser {
   @IsEnum(OnlineStatusEnum)
   public onlineStatus: OnlineStatusEnum = OnlineStatusEnum.OFFLINE;
 
+  @Field(() => OnlineStatusEnum, { nullable: true })
   @Enum({
     items: () => OnlineStatusEnum,
     default: OnlineStatusEnum.ONLINE,
@@ -105,6 +105,7 @@ export class UserEntity extends LocalBaseEntity implements IUser {
   @IsDate()
   public lastLogin: Date = new Date();
 
+  @Field(() => GraphQLTimestamp)
   @Property()
   @IsDate()
   public lastOnline: Date = new Date();

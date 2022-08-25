@@ -17,6 +17,10 @@ import { EmailModule } from './email/email.module';
 import { UploaderModule } from './uploader/uploader.module';
 import { UsersModule } from './users/users.module';
 import { LoadersModule } from './loaders/loaders.module';
+import { RedisClientModule } from './redis-client/redis-client.module';
+import { EncryptionModule } from './encryption/encryption.module';
+import { ChatsModule } from './chats/chats.module';
+import { MessagesModule } from './messages/messages.module';
 
 @Module({
   imports: [
@@ -44,6 +48,10 @@ import { LoadersModule } from './loaders/loaders.module';
     EmailModule,
     UploaderModule,
     LoadersModule,
+    RedisClientModule,
+    EncryptionModule,
+    ChatsModule,
+    MessagesModule,
   ],
   providers: [
     {

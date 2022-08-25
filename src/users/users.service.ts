@@ -1,5 +1,5 @@
+import { EntityRepository } from '@mikro-orm/mongodb';
 import { InjectRepository } from '@mikro-orm/nestjs';
-import { EntityRepository } from '@mikro-orm/postgresql';
 import {
   BadRequestException,
   CACHE_MANAGER,
@@ -15,15 +15,13 @@ import { RegisterDto } from '../auth/dtos/register.dto';
 import { ISessionsData } from '../auth/interfaces/sessions-data.interface';
 import { ITokenPayload } from '../auth/interfaces/token-payload.interface';
 import { CommonService } from '../common/common.service';
-import { LocalMessageType } from '../common/gql-types/message.type';
+import { SearchDto } from '../common/dtos/search.dto';
+import { LocalMessageType } from '../common/entities/gql/message.type';
+import { getUserQueryCursor } from '../common/enums/query-cursor.enum';
 import { IPaginated } from '../common/interfaces/paginated.interface';
 import { UploaderService } from '../uploader/uploader.service';
 import { OnlineStatusDto } from './dtos/online-status.dto';
-import { ProfilePictureDto } from './dtos/profile-picture.dto';
 import { UserEntity } from './entities/user.entity';
-import { SearchDto } from '../common/dtos/search.dto';
-import { getUserQueryCursor } from '../common/enums/query-cursor.enum';
-import { RatioEnum } from '../common/enums/ratio.enum';
 
 @Injectable()
 export class UsersService {
@@ -78,31 +76,6 @@ export class UsersService {
     });
 
     await this.saveUserToDb(user, true);
-    return user;
-  }
-
-  /**
-   * Update Profile Picture
-   *
-   * Updates the current user profile picture and deletes
-   * the old one if it exits
-   */
-  public async updateProfilePicture(
-    userId: number,
-    { picture }: ProfilePictureDto,
-  ): Promise<UserEntity> {
-    const user = await this.userById(userId);
-    const toDelete = user.picture;
-
-    user.picture = await this.uploaderService.uploadImage(
-      userId,
-      picture,
-      RatioEnum.SQUARE,
-    );
-
-    if (toDelete) await this.uploaderService.deleteFile(toDelete);
-
-    await this.saveUserToDb(user);
     return user;
   }
 

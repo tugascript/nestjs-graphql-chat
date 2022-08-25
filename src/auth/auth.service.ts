@@ -12,7 +12,7 @@ import dayjs from 'dayjs';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { v4 as uuidV4, v5 as uuidV5 } from 'uuid';
 import { CommonService } from '../common/common.service';
-import { LocalMessageType } from '../common/gql-types/message.type';
+import { LocalMessageType } from '../common/entities/gql/message.type';
 import { IJwt, ISingleJwt } from '../config/interfaces/jwt.interface';
 import { IWsCtx } from '../config/interfaces/ws-ctx.interface';
 import { EmailService } from '../email/email.service';
