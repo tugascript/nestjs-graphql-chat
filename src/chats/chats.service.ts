@@ -13,6 +13,7 @@ import { CommonService } from '../common/common.service';
 import { SearchDto } from '../common/dtos/search.dto';
 import { LocalMessageType } from '../common/entities/gql/message.type';
 import { getAfterCursor } from '../common/enums/after-cursor.enum';
+import { NotificationTypeEnum } from '../common/enums/notification-type.enum';
 import { getQueryCursor } from '../common/enums/query-cursor.enum';
 import { QueryOrderEnum } from '../common/enums/query-order.enum';
 import { IPaginated } from '../common/interfaces/paginated.interface';
@@ -28,7 +29,8 @@ import { ChatTypeEnum } from './enums/chat-type.enum';
 import { CreateChatInput } from './inputs/create-chat.input';
 import { UpdateChatInput } from './inputs/update-chat.input';
 import { UpdateNicknameInput } from './inputs/update-nickname.input';
-import { UpdateUsersNicknameInput } from './inputs/update-users-nickname.input';
+import { UpdateProfileNicknameInput } from './inputs/update-profile-nickname.input';
+import { IChatNotification } from './interfaces/chat-notification.interface';
 
 @Injectable()
 export class ChatsService implements OnModuleInit {
@@ -92,6 +94,7 @@ export class ChatsService implements OnModuleInit {
       profile,
       this.chatExpiration,
     );
+    this.generateChatNotification(pubsub, chat, NotificationTypeEnum.NEW);
     return chat;
   }
 
@@ -125,6 +128,7 @@ export class ChatsService implements OnModuleInit {
       profile,
       time,
     );
+    this.generateChatNotification(pubsub, chat, NotificationTypeEnum.UPDATE);
     return profile;
   }
 
@@ -219,6 +223,14 @@ export class ChatsService implements OnModuleInit {
     );
   }
 
+  public async countProfiles(chatId: string): Promise<number> {
+    return this.profilesRepository
+      .search()
+      .where('chatId')
+      .equals(chatId)
+      .return.count();
+  }
+
   public async profileById(
     userId: string,
     { chatId, profileId }: ProfileDto,
@@ -272,6 +284,7 @@ export class ChatsService implements OnModuleInit {
       chat,
       chat.expiration(),
     );
+    this.generateChatNotification(pubsub, chat, NotificationTypeEnum.UPDATE);
     return chat;
   }
 
@@ -298,10 +311,11 @@ export class ChatsService implements OnModuleInit {
       );
     }
 
+    this.generateChatNotification(pubsub, chat, NotificationTypeEnum.DELETE);
     return new LocalMessageType('Chat deleted successfully');
   }
 
-  public async updateNickname(
+  public async updateOwnNickname(
     pubsub: PubSub,
     userId: string,
     { chatId, nickname }: UpdateNicknameInput,
@@ -315,15 +329,20 @@ export class ChatsService implements OnModuleInit {
       userProfile,
       userProfile.expiration(),
     );
+    const chat = await this.chatsRepository.fetch(chatId);
+
+    if (chat)
+      this.generateChatNotification(pubsub, chat, NotificationTypeEnum.UPDATE);
+
     return userProfile;
   }
 
-  public async updateUsersNickname(
+  public async updateProfileNickname(
     pubsub: PubSub,
     userId: string,
-    { chatId, profileId, nickname }: UpdateUsersNicknameInput,
+    { chatId, profileId, nickname }: UpdateProfileNicknameInput,
   ): Promise<ProfileEntity> {
-    await this.checkChatOwnership(userId, chatId);
+    const chat = await this.checkChatOwnership(userId, chatId);
     const profile = await this.profilesRepository
       .search()
       .where('entityId')
@@ -340,10 +359,12 @@ export class ChatsService implements OnModuleInit {
       profile,
       profile.expiration(),
     );
+    this.generateChatNotification(pubsub, chat, NotificationTypeEnum.UPDATE);
     return profile;
   }
 
   public async leaveChat(
+    pubsub: PubSub,
     userId: string,
     chatId: string,
   ): Promise<LocalMessageType> {
@@ -367,6 +388,7 @@ export class ChatsService implements OnModuleInit {
   }
 
   public async removeProfile(
+    pubsub: PubSub,
     userId: string,
     { chatId, profileId }: ProfileDto,
   ): Promise<LocalMessageType> {
@@ -429,18 +451,37 @@ export class ChatsService implements OnModuleInit {
   private async checkChatOwnership(
     userId: string,
     chatId: string,
-  ): Promise<void> {
-    const count = await this.chatsRepository
+  ): Promise<ChatEntity> {
+    const chat = await this.chatsRepository
       .search()
       .where('entityId')
       .equals(chatId)
       .and('userId')
       .equals(userId)
-      .return.count();
+      .return.first();
 
-    if (count === 0)
+    if (!chat)
       throw new UnauthorizedException(
         'Chat does not exist or you are not the author.',
       );
+
+    return chat;
+  }
+
+  private generateChatNotification(
+    pubsub: PubSub,
+    chat: ChatEntity,
+    notificationType: NotificationTypeEnum,
+  ): void {
+    pubsub.publish<IChatNotification>({
+      topic: `CHAT_${chat.entityId.toUpperCase()}`,
+      payload: {
+        chatNotification: this.commonService.generateNotification(
+          chat,
+          notificationType,
+          'createdAt',
+        ),
+      },
+    });
   }
 }
