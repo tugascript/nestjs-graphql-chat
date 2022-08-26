@@ -1,28 +1,25 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
-import {
-  Embedded,
-  Entity,
-  Enum,
-  OptionalProps,
-  Property,
-} from '@mikro-orm/core';
+import { Entity, Enum, OptionalProps, Property, Unique } from '@mikro-orm/core';
 import { Field, GraphQLTimestamp, ObjectType } from '@nestjs/graphql';
 import {
   IsBoolean,
   IsDate,
   IsEmail,
   IsEnum,
+  IsInt,
+  IsOptional,
   IsString,
   Length,
   Matches,
+  Min,
 } from 'class-validator';
+import { Schema } from 'redis-om';
 import {
   BCRYPT_HASH,
   NAME_REGEX,
   SLUG_REGEX,
 } from '../../common/constants/regex';
 import { LocalBaseEntity } from '../../common/entities/base.entity';
-import { CredentialsEmbeddable } from '../embeddables/credentials.embeddable';
 import { OnlineStatusEnum } from '../enums/online-status.enum';
 import { IUser } from '../interfaces/user.interface';
 
@@ -52,6 +49,7 @@ export class UserEntity extends LocalBaseEntity implements IUser {
 
   @Field(() => String)
   @Property()
+  @Unique()
   @IsString()
   @Length(3, 110)
   @Matches(SLUG_REGEX)
@@ -61,6 +59,13 @@ export class UserEntity extends LocalBaseEntity implements IUser {
   @Property()
   @IsEmail()
   public email!: string;
+
+  @Field(() => String, { nullable: true })
+  @Property({ nullable: true })
+  @IsString()
+  @Length(1, 500)
+  @IsOptional()
+  public description?: string;
 
   @Property()
   @IsString()
@@ -98,8 +103,10 @@ export class UserEntity extends LocalBaseEntity implements IUser {
   @IsBoolean()
   public twoFactor: boolean = false;
 
-  @Embedded(() => CredentialsEmbeddable)
-  public credentials: CredentialsEmbeddable = new CredentialsEmbeddable();
+  @Property({ default: 1 })
+  @IsInt()
+  @Min(1)
+  public count: number = 1;
 
   @Property()
   @IsDate()
@@ -110,3 +117,22 @@ export class UserEntity extends LocalBaseEntity implements IUser {
   @IsDate()
   public lastOnline: Date = new Date();
 }
+
+export const userSchema = new Schema(UserEntity, {
+  id: { type: 'string' },
+  name: { type: 'string' },
+  username: { type: 'string' },
+  email: { type: 'string' },
+  description: { type: 'string' },
+  password: { type: 'string' },
+  onlineStatus: { type: 'string' },
+  defaultStatus: { type: 'string' },
+  confirmed: { type: 'boolean' },
+  suspended: { type: 'boolean' },
+  twoFactor: { type: 'boolean' },
+  count: { type: 'number' },
+  lastLogin: { type: 'date' },
+  lastOnline: { type: 'date' },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' },
+});

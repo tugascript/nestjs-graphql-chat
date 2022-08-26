@@ -1,4 +1,4 @@
 export interface IWsCtx {
-  userId: number;
+  userId: string;
   sessionId: string;
 }

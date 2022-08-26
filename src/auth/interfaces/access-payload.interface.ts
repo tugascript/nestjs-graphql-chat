@@ -1,5 +1,5 @@
 export interface IAccessPayload {
-  id: number;
+  id: string;
 }
 
 export interface IAccessPayloadResponse extends IAccessPayload {

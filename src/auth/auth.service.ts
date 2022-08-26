@@ -114,10 +114,10 @@ export class AuthService {
       throw new BadRequestException('Email already confirmed');
 
     user.confirmed = true;
-    user.credentials.updateVersion();
+    user.count++;
     user.lastLogin = new Date();
     await this.usersService.saveUserToDb(user);
-
+    await this.usersService.updateRedisUser(user);
     const [accessToken, refreshToken] = await this.generateAuthTokens(user);
     this.saveRefreshCookie(res, refreshToken);
     return { accessToken };
@@ -134,40 +134,9 @@ export class AuthService {
     { email, password }: LoginDto,
   ): Promise<IAuthResult | LocalMessageType> {
     const user = await this.usersService.getUserForAuth(email);
-    const currentPassword = user.password;
-    const { lastPassword, updatedAt } = user.credentials;
-    const now = dayjs();
-    const time = dayjs.unix(updatedAt);
-    const months = now.diff(time, 'month');
 
-    if (!(await compare(password, currentPassword))) {
-      // To check for passwords changes, based on facebook auth
-      if (lastPassword.length > 0 && !(await compare(password, lastPassword))) {
-        let message = 'You changed your password ';
-
-        if (months > 0) {
-          message += months + ' months ago.';
-        } else {
-          const days = now.diff(time, 'day');
-
-          if (days > 0) {
-            message += days + ' days ago.';
-          } else {
-            const hours = now.diff(time, 'hour');
-
-            if (hours > 0) {
-              message += hours + ' hours ago.';
-            } else {
-              message += 'recently.';
-            }
-          }
-        }
-
-        throw new UnauthorizedException(message);
-      }
-
+    if (!(await compare(password, user.password)))
       throw new UnauthorizedException('Invalid credentials');
-    }
 
     if (!user.confirmed) {
       this.sendConfirmationEmail(user);
@@ -187,37 +156,17 @@ export class AuthService {
       );
 
       this.emailService.sendAccessCode(user, code);
-
       return new LocalMessageType('Login confirmation code sent');
     }
 
-    const [accessToken, refreshToken] = await this.generateAuthTokens(user);
-    this.saveRefreshCookie(res, refreshToken);
-
     user.lastLogin = new Date();
     await this.usersService.saveUserToDb(user);
-
+    await this.usersService.updateRedisUser(user);
+    const [accessToken, refreshToken] = await this.generateAuthTokens(user);
+    this.saveRefreshCookie(res, refreshToken);
     return {
       accessToken,
-      message:
-        months >= 6
-          ? new LocalMessageType('Please confirm your credentials')
-          : undefined,
     };
-  }
-
-  /**
-   * Confirm Credentials
-   *
-   * Confirms credentials update by user
-   */
-  public async confirmCredentials(userId: number): Promise<LocalMessageType> {
-    const user = await this.usersService.userById(userId);
-
-    user.credentials.updatedAt = dayjs().unix();
-    await this.usersService.saveUserToDb(user);
-
-    return new LocalMessageType('Authentication credentials confirmed');
   }
 
   /**
@@ -244,6 +193,7 @@ export class AuthService {
 
     user.lastLogin = new Date();
     await this.usersService.saveUserToDb(user);
+    await this.usersService.updateRedisUser(user);
 
     return { accessToken };
   }
@@ -284,14 +234,13 @@ export class AuthService {
     )) as ITokenPayloadResponse;
     const user = await this.usersService.getUncheckUserById(payload.id);
 
-    if (user.credentials.version !== payload.count) {
+    if (!user || user.count !== payload.count) {
       this.logoutUser(res);
       throw new UnauthorizedException('Token is invalid or expired');
     }
 
     const [accessToken, refreshToken] = await this.generateAuthTokens(user);
     this.saveRefreshCookie(res, refreshToken);
-
     return { accessToken };
   }
 
@@ -307,7 +256,7 @@ export class AuthService {
 
     if (user) {
       const resetToken = await this.generateAuthToken(
-        { id: user.id, count: user.credentials.version },
+        { id: user.id, count: user.count },
         'resetPassword',
       );
       const url = `${this.url}/reset-password/${resetToken}/`;
@@ -336,7 +285,7 @@ export class AuthService {
       throw new BadRequestException('Passwords do not match');
 
     const user = await this.usersService.getUserByPayload(payload);
-    user.credentials.updatePassword(user.password);
+    user.count++;
     user.password = await hash(password1, 10);
     await this.usersService.saveUserToDb(user);
 
@@ -348,13 +297,14 @@ export class AuthService {
    *
    * Activates or deactivates two-factor auth
    */
-  public async changeTwoFactorAuth(userId: number): Promise<LocalMessageType> {
-    const user = await this.usersService.userById(userId);
+  public async changeTwoFactorAuth(userId: string): Promise<LocalMessageType> {
+    const user = await this.usersService.mongoUserById(userId);
 
     user.twoFactor = !user.twoFactor;
     await this.usersService.saveUserToDb(user);
-
+    await this.usersService.updateRedisUser(user);
     const status = user.twoFactor ? 'activated' : 'deactivated';
+
     return new LocalMessageType(
       `Two factor authentication ${status} successfully`,
     );
@@ -367,10 +317,10 @@ export class AuthService {
    */
   public async updateEmail(
     res: FastifyReply,
-    userId: number,
+    userId: string,
     { email, password }: ChangeEmailDto,
   ): Promise<IAuthResult> {
-    const user = await this.usersService.userById(userId);
+    const user = await this.usersService.mongoUserById(userId);
 
     if (!(await compare(password, user.password)))
       throw new BadRequestException('Wrong password');
@@ -380,9 +330,9 @@ export class AuthService {
         'The new email has to differ from the old one',
       );
     user.email = email;
-    user.credentials.updateVersion();
+    user.count++;
     await this.usersService.saveUserToDb(user);
-
+    await this.usersService.updateRedisUser(user);
     const [accessToken, refreshToken] = await this.generateAuthTokens(user);
     this.saveRefreshCookie(res, refreshToken);
 
@@ -398,10 +348,10 @@ export class AuthService {
    */
   public async updatePassword(
     res: FastifyReply,
-    userId: number,
+    userId: string,
     { password, password1, password2 }: ChangePasswordDto,
   ): Promise<IAuthResult> {
-    const user = await this.usersService.userById(userId);
+    const user = await this.usersService.mongoUserById(userId);
 
     if (!(await compare(password, user.password)))
       throw new BadRequestException('Wrong password');
@@ -414,7 +364,7 @@ export class AuthService {
     if (password1 !== password2)
       throw new BadRequestException('Passwords do not match');
 
-    user.credentials.updatePassword(user.password);
+    user.count++;
     user.password = await hash(password1, 10);
     await this.usersService.saveUserToDb(user);
 
@@ -433,11 +383,11 @@ export class AuthService {
    */
   public async generateWsSession(
     accessToken: string,
-  ): Promise<[number, string]> {
+  ): Promise<[string, string]> {
     const { id } = await this.verifyAuthToken(accessToken, 'access');
     const user = await this.usersService.userById(id);
     const userUuid = uuidV5(user.id.toString(), this.wsNamespace);
-    const count = user.credentials.version;
+    const count = user.count;
     let sessionData = await this.commonService.throwInternalError(
       this.cacheManager.get<ISessionsData>(userUuid),
     );
@@ -483,7 +433,7 @@ export class AuthService {
       const user = await this.usersService.getUncheckUserById(userId);
       if (!user) return false;
 
-      if (user.credentials.version !== sessionData.count) {
+      if (user.count !== sessionData.count) {
         await this.commonService.throwInternalError(
           this.cacheManager.del(userUuid),
         );
@@ -520,10 +470,11 @@ export class AuthService {
       await this.commonService.throwInternalError(
         this.cacheManager.del(userUuid),
       );
-      const user = await this.usersService.userById(userId);
+      const user = await this.usersService.mongoUserById(userId);
       user.lastOnline = new Date();
       user.onlineStatus = OnlineStatusEnum.OFFLINE;
       await this.usersService.saveUserToDb(user);
+      await this.usersService.updateRedisUser(user);
       return;
     }
 
@@ -562,7 +513,7 @@ export class AuthService {
    */
   private async sendConfirmationEmail(user: UserEntity): Promise<string> {
     const emailToken = await this.generateAuthToken(
-      { id: user.id, count: user.credentials.version },
+      { id: user.id, count: user.count },
       'confirmation',
     );
     const url = `${this.url}/confirm-email/${emailToken}/`;
@@ -580,11 +531,11 @@ export class AuthService {
    */
   private async generateAuthTokens({
     id,
-    credentials,
+    count,
   }: UserEntity): Promise<[string, string]> {
     return Promise.all([
       this.generateAuthToken({ id }, 'access'),
-      this.generateAuthToken({ id, count: credentials.version }, 'refresh'),
+      this.generateAuthToken({ id, count }, 'refresh'),
     ]);
   }
 

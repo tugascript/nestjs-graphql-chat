@@ -5,7 +5,7 @@ export interface IUser extends IBase {
   name: string;
   username: string;
   email: string;
-  picture?: string;
+  description?: string;
   onlineStatus: OnlineStatusEnum;
   lastOnline: Date;
 }

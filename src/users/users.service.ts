@@ -1,15 +1,18 @@
-import { EntityRepository } from '@mikro-orm/mongodb';
+import { FilterQuery } from '@mikro-orm/core';
+import { EntityRepository, ObjectId } from '@mikro-orm/mongodb';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import {
   BadRequestException,
   CACHE_MANAGER,
   Inject,
   Injectable,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { compare, hash } from 'bcrypt';
 import { Cache } from 'cache-manager';
+import { Repository } from 'redis-om';
 import { v4 as uuidV4, v5 as uuidV5 } from 'uuid';
 import { RegisterDto } from '../auth/dtos/register.dto';
 import { ISessionsData } from '../auth/interfaces/sessions-data.interface';
@@ -17,19 +20,23 @@ import { ITokenPayload } from '../auth/interfaces/token-payload.interface';
 import { CommonService } from '../common/common.service';
 import { SearchDto } from '../common/dtos/search.dto';
 import { LocalMessageType } from '../common/entities/gql/message.type';
+import { getAfterCursor } from '../common/enums/after-cursor.enum';
 import { getUserQueryCursor } from '../common/enums/query-cursor.enum';
 import { IPaginated } from '../common/interfaces/paginated.interface';
+import { RedisClientService } from '../redis-client/redis-client.service';
 import { UploaderService } from '../uploader/uploader.service';
 import { OnlineStatusDto } from './dtos/online-status.dto';
-import { UserEntity } from './entities/user.entity';
+import { UserEntity, userSchema } from './entities/user.entity';
 
 @Injectable()
-export class UsersService {
+export class UsersService implements OnModuleInit {
   private readonly wsNamespace = this.configService.get<string>('WS_UUID');
   private readonly wsAccessTime =
     this.configService.get<number>('jwt.wsAccess.time');
+  private readonly usersRedisRepo: Repository<UserEntity>;
 
   constructor(
+    private readonly redisClient: RedisClientService,
     @InjectRepository(UserEntity)
     private readonly usersRepository: EntityRepository<UserEntity>,
     private readonly commonService: CommonService,
@@ -37,7 +44,13 @@ export class UsersService {
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
-  ) {}
+  ) {
+    this.usersRedisRepo = this.redisClient.fetchRepository(userSchema);
+  }
+
+  public async onModuleInit(): Promise<void> {
+    await this.usersRedisRepo.createIndex();
+  }
 
   //____________________ MUTATIONS ____________________
 
@@ -56,12 +69,13 @@ export class UsersService {
       throw new BadRequestException('Passwords do not match');
 
     name = this.commonService.formatTitle(name);
+    email = email.toLowerCase();
     const password = await hash(password1, 10);
     let username = this.commonService.generatePointSlug(name);
 
     if (username.length >= 3) {
       const count = await this.usersRepository.count({
-        username: { $like: `${username}%` },
+        username: new RegExp(`^${username}`, 'i'),
       });
       if (count > 0) username += count.toString();
     } else {
@@ -74,9 +88,8 @@ export class UsersService {
       email,
       password,
     });
-
     await this.saveUserToDb(user, true);
-    return user;
+    return this.createRedisUser(user);
   }
 
   /**
@@ -85,7 +98,7 @@ export class UsersService {
    * Updates the default online status of current user
    */
   public async updateDefaultStatus(
-    userId: number,
+    userId: string,
     { defaultStatus }: OnlineStatusDto,
   ): Promise<LocalMessageType> {
     const user = await this.userById(userId);
@@ -115,7 +128,7 @@ export class UsersService {
    * Deletes current user account
    */
   public async deleteUser(
-    userId: number,
+    userId: string,
     password: string,
   ): Promise<LocalMessageType> {
     const user = await this.userById(userId);
@@ -152,6 +165,14 @@ export class UsersService {
   public async getUncheckUser(
     email: string,
   ): Promise<UserEntity | undefined | null> {
+    const redisUser = await this.usersRedisRepo
+      .search()
+      .where('email')
+      .equals(email)
+      .return.first();
+
+    if (redisUser) return redisUser;
+
     return this.usersRepository.findOne({ email });
   }
 
@@ -161,9 +182,17 @@ export class UsersService {
    * Gets a user by id and does not check if it exists
    */
   public async getUncheckUserById(
-    id: number,
+    id: string,
   ): Promise<UserEntity | undefined | null> {
-    return this.usersRepository.findOne({ id });
+    const redisUser = await this.usersRedisRepo
+      .search()
+      .where('id')
+      .equals(id)
+      .return.first();
+
+    if (redisUser) return redisUser;
+
+    return this.usersRepository.findOne({ _id: new ObjectId(id) });
   }
 
   /**
@@ -175,8 +204,11 @@ export class UsersService {
     id,
     count,
   }: ITokenPayload): Promise<UserEntity> {
-    const user = await this.usersRepository.findOne({ id });
-    if (!user || user.credentials.version !== count)
+    const user = await this.usersRepository.findOne({
+      _id: new ObjectId(id),
+      count,
+    });
+    if (!user)
       throw new UnauthorizedException('Token is invalid or has expired');
     return user;
   }
@@ -186,8 +218,25 @@ export class UsersService {
    *
    * Gets user by id, usually the current logged-in user
    */
-  public async userById(id: number): Promise<UserEntity> {
-    const user = await this.usersRepository.findOne({ id });
+  public async userById(id: string): Promise<UserEntity> {
+    let redisUser = await this.usersRedisRepo
+      .search()
+      .where('id')
+      .equals(id)
+      .return.first();
+
+    if (!redisUser) {
+      const user = await this.mongoUserById(id);
+      redisUser = await this.createRedisUser(user);
+    }
+
+    return redisUser;
+  }
+
+  public async mongoUserById(id: string): Promise<UserEntity> {
+    const user = await this.usersRepository.findOne({
+      _id: new ObjectId(id),
+    });
     this.commonService.checkExistence('User', user);
     return user;
   }
@@ -198,9 +247,19 @@ export class UsersService {
    * Gets user by username, usually for the profile (if it exists)
    */
   public async userByUsername(username: string): Promise<UserEntity> {
-    const user = await this.usersRepository.findOne({ username });
-    this.commonService.checkExistence('User', user);
-    return user;
+    let redisUser = await this.usersRedisRepo
+      .search()
+      .where('username')
+      .equals(username)
+      .return.first();
+
+    if (!redisUser) {
+      const user = await this.usersRepository.findOne({ username });
+      this.commonService.checkExistence('User', user);
+      redisUser = await this.createRedisUser(user);
+    }
+
+    return redisUser;
   }
 
   /**
@@ -215,31 +274,32 @@ export class UsersService {
     first,
     after,
   }: SearchDto): Promise<IPaginated<UserEntity>> {
-    const name = 'u';
-
-    const qb = this.usersRepository.createQueryBuilder(name).where({
+    const where: FilterQuery<UserEntity> = {
       confirmed: true,
-    });
+    };
 
     if (search) {
-      qb.andWhere({
-        name: {
-          $ilike: this.commonService.formatSearch(search),
+      const regSearch = this.commonService.formatSearch(search);
+      where['$or'] = [
+        {
+          name: regSearch,
         },
-      });
+        {
+          description: regSearch,
+        },
+      ];
     }
 
-    return await this.commonService.queryBuilderPagination(
-      name,
+    return await this.commonService.findAndCountPagination(
       getUserQueryCursor(cursor),
       first,
       order,
-      qb,
+      this.usersRepository,
+      where,
       after,
+      getAfterCursor(cursor),
     );
   }
-
-  //____________________ OTHER ____________________
 
   /**
    * Save User To Database
@@ -250,5 +310,63 @@ export class UsersService {
    */
   public async saveUserToDb(user: UserEntity, isNew = false): Promise<void> {
     await this.commonService.saveEntity(this.usersRepository, user, isNew);
+  }
+
+  public async updateRedisUser(user: UserEntity): Promise<UserEntity> {
+    const redisUser = await this.usersRedisRepo
+      .search()
+      .where('id')
+      .equals(user.id)
+      .return.first();
+
+    if (redisUser) {
+      for (const key in user) {
+        if (
+          redisUser.hasOwnProperty(key) &&
+          user.hasOwnProperty(key) &&
+          redisUser[key] !== user[key]
+        ) {
+          redisUser[key] = user[key];
+        }
+      }
+
+      await this.commonService.saveRedisEntity(
+        this.usersRedisRepo,
+        redisUser,
+        604800,
+      );
+      return redisUser;
+    }
+
+    return this.createRedisUser(user);
+  }
+
+  //____________________ OTHER ____________________
+
+  private async createRedisUser(user: UserEntity): Promise<UserEntity> {
+    const redisUser = this.usersRedisRepo.createEntity({
+      id: user.id,
+      name: user.name,
+      username: user.username,
+      email: user.email,
+      description: user.description,
+      password: user.password,
+      onlineStatus: user.onlineStatus,
+      defaultStatus: user.defaultStatus,
+      confirmed: user.confirmed,
+      suspended: user.suspended,
+      twoFactor: user.twoFactor,
+      count: user.count,
+      lastLogin: user.lastLogin,
+      lastOnline: user.lastOnline,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    });
+    await this.commonService.saveRedisEntity(
+      this.usersRedisRepo,
+      redisUser,
+      604800,
+    );
+    return user;
   }
 }
