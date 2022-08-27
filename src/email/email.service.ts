@@ -3,14 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { createTransport } from 'nodemailer';
 import { IEmailConfig } from '../config/interfaces/email-config.interface';
 import { UserEntity } from '../users/entities/user.entity';
+import { UserRedisEntity } from '../users/entities/user.redis-entity';
 import { confirmationEmail } from './templates/confirmation';
 import { loginConfirmationEmail } from './templates/login-confirmation';
 import { passwordResetEmail } from './templates/password-reset';
 
 @Injectable()
 export class EmailService {
-  constructor(private readonly configService: ConfigService) {}
-
   private readonly transport = createTransport(
     this.configService.get<IEmailConfig>('emailService'),
   );
@@ -18,8 +17,10 @@ export class EmailService {
     'EMAIL_USER',
   )}>`;
 
+  constructor(private readonly configService: ConfigService) {}
+
   public async sendConfirmationEmail(
-    { name, email }: UserEntity,
+    { name, email }: UserEntity | UserRedisEntity,
     url: string,
   ): Promise<void> {
     await this.sendEmail(
@@ -30,7 +31,7 @@ export class EmailService {
   }
 
   public async sendPasswordResetEmail(
-    { name, email }: UserEntity,
+    { name, email }: UserEntity | UserRedisEntity,
     url: string,
   ): Promise<void> {
     await this.sendEmail(
@@ -41,7 +42,7 @@ export class EmailService {
   }
 
   public async sendAccessCode(
-    { email, name }: UserEntity,
+    { email, name }: UserEntity | UserRedisEntity,
     accessCode: string,
   ): Promise<void> {
     await this.sendEmail(

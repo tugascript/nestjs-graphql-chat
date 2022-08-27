@@ -7,4 +7,6 @@ export enum AfterCursorEnum {
 }
 
 export const getAfterCursor = (cursor: QueryCursorEnum) =>
-  QueryCursorEnum.DATE ? AfterCursorEnum.DATE : AfterCursorEnum.STRING;
+  cursor === QueryCursorEnum.DATE
+    ? AfterCursorEnum.DATE
+    : AfterCursorEnum.STRING;

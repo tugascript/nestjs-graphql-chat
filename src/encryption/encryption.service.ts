@@ -1,20 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { genSalt } from 'bcrypt';
 import { createCipheriv, createDecipheriv, randomBytes, scrypt } from 'crypto';
 import { promisify } from 'util';
+import { v4 as uuidV4 } from 'uuid';
 
 @Injectable()
 export class EncryptionService {
   private readonly masterKey = this.configService.get<string>('MASTER_KEY');
-  private readonly masterPassword =
-    this.configService.get<string>('MASTER_PASSWORD');
 
   constructor(private readonly configService: ConfigService) {}
 
   public async generateChatKey(): Promise<string> {
     const key = (await promisify(scrypt)(
-      this.masterPassword,
-      'salt',
+      uuidV4(),
+      await genSalt(5),
       32,
     )) as Buffer;
     return this.masterEncrypt(key.toString('base64'));

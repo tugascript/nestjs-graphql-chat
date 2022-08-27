@@ -13,7 +13,6 @@ import {
   Matches,
   Min,
 } from 'class-validator';
-import { Schema } from 'redis-om';
 import {
   BCRYPT_HASH,
   NAME_REGEX,
@@ -57,6 +56,7 @@ export class UserEntity extends LocalBaseEntity implements IUser {
 
   @Field(() => String, { nullable: true })
   @Property()
+  @Unique()
   @IsEmail()
   public email!: string;
 
@@ -108,6 +108,7 @@ export class UserEntity extends LocalBaseEntity implements IUser {
   @Min(1)
   public count: number = 1;
 
+  @Field(() => GraphQLTimestamp)
   @Property()
   @IsDate()
   public lastLogin: Date = new Date();
@@ -117,22 +118,3 @@ export class UserEntity extends LocalBaseEntity implements IUser {
   @IsDate()
   public lastOnline: Date = new Date();
 }
-
-export const userSchema = new Schema(UserEntity, {
-  id: { type: 'string' },
-  name: { type: 'string' },
-  username: { type: 'string' },
-  email: { type: 'string' },
-  description: { type: 'string' },
-  password: { type: 'string' },
-  onlineStatus: { type: 'string' },
-  defaultStatus: { type: 'string' },
-  confirmed: { type: 'boolean' },
-  suspended: { type: 'boolean' },
-  twoFactor: { type: 'boolean' },
-  count: { type: 'number' },
-  lastLogin: { type: 'date' },
-  lastOnline: { type: 'date' },
-  createdAt: { type: 'date' },
-  updatedAt: { type: 'date' },
-});

@@ -1,8 +1,8 @@
 import { ObjectType } from '@nestjs/graphql';
 import { Paginated } from '../../../common/entities/gql/paginated.type';
-import { ProfileEntity } from '../profiles.entity';
+import { ProfileRedisEntity } from '../profile.redis-entity';
 
 @ObjectType('PaginatedProfiles')
-export abstract class PaginatedProfilesType extends Paginated<ProfileEntity>(
-  ProfileEntity,
+export abstract class PaginatedProfilesType extends Paginated<ProfileRedisEntity>(
+  ProfileRedisEntity,
 ) {}

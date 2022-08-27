@@ -1,5 +1,5 @@
 import { ArgsType, Field } from '@nestjs/graphql';
-import { IsString, Length, Matches } from 'class-validator';
+import { IsOptional, IsString, Length, Matches } from 'class-validator';
 import { NAME_REGEX } from '../../common/constants/regex';
 import { FilterRelationDto } from '../../common/dtos/filter-relation.dto';
 
@@ -9,5 +9,6 @@ export abstract class FilterChatProfilesDto extends FilterRelationDto {
   @IsString()
   @Matches(NAME_REGEX)
   @Length(3, 100)
+  @IsOptional()
   public nickname?: string;
 }

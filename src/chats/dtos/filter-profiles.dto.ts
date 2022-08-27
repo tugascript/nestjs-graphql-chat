@@ -1,5 +1,5 @@
 import { ArgsType, Field } from '@nestjs/graphql';
-import { IsString, Length, Matches } from 'class-validator';
+import { IsOptional, IsString, Length, Matches } from 'class-validator';
 import { NAME_REGEX, ULID_REGEX } from '../../common/constants/regex';
 import { PaginationDto } from '../../common/dtos/pagination.dto';
 
@@ -15,5 +15,6 @@ export abstract class FilterProfilesDto extends PaginationDto {
   @IsString()
   @Matches(NAME_REGEX)
   @Length(3, 100)
+  @IsOptional()
   public nickname?: string;
 }

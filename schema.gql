@@ -2,61 +2,202 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+enum ChangeType {
+  DELETE
+  NEW
+  UPDATE
+}
+
+type Chat {
+  author: User!
+  chatType: ChatType!
+  createdAt: Timestamp!
+  endOfLife: Timestamp!
+  entityId: ID!
+  expiration: Int!
+  invitation: String
+  messages(first: Int = 10): PaginatedMessages!
+  name: String!
+  profiles(first: Int = 10, nickname: String, order: QueryOrder = ASC): PaginatedProfiles!
+  profilesCount: Int!
+  slug: String!
+  time: Int!
+  updatedAt: Timestamp!
+}
+
+type ChatChange {
+  edge: ChatRedisEntityChangeEdge!
+  type: ChangeType!
+}
+
+type ChatMessage {
+  body: String!
+  chat: Chat!
+  createdAt: Timestamp!
+  endOfLife: Timestamp!
+  entityId: ID!
+  expiration: Int!
+  profile: Profile!
+  time: Int!
+  updatedAt: Timestamp!
+}
+
+type ChatMessageRedisEntityChangeEdge {
+  cursor: String!
+  node: ChatMessage!
+}
+
+type ChatMessageRedisEntityPageEdge {
+  cursor: String!
+  node: ChatMessage!
+}
+
+type ChatRedisEntityChangeEdge {
+  cursor: String!
+  node: Chat!
+}
+
+type ChatRedisEntityPageEdge {
+  cursor: String!
+  node: Chat!
+}
+
+enum ChatType {
+  PRIVATE
+  PUBLIC
+}
+
+input CreateChatInput {
+  chatType: ChatType!
+  name: String!
+  time: Int!
+}
+
+input CreateMessageInput {
+  body: String!
+  chatId: String!
+}
+
 type Message {
   id: ID!
   message: String!
 }
 
-type PageInfo {
-  startCursor: String!
-  endCursor: String!
-  hasNextPage: Boolean!
-  hasPreviousPage: Boolean!
+type MessageChange {
+  edge: ChatMessageRedisEntityChangeEdge!
+  type: ChangeType!
 }
 
-type User {
-  id: Int!
-  createdAt: String!
-  updatedAt: String!
-  name: String!
-  username: String!
-  email: String
-  picture: String
-  onlineStatus: OnlineStatus!
-  lastOnline: String!
+type Mutation {
+  createChat(input: CreateChatInput!): Chat!
+  createMessage(input: CreateMessageInput!): ChatMessage!
+  createProfile(invitation: String!): Profile!
+  deleteAccount(password: String!): Message!
+  leaveChat(chatId: String!): Message!
+  removeChat(chatId: String!): Message!
+  removeMessage(chatId: String!, messageId: String!): Message!
+  removeProfile(chatId: String!, profileId: String!): Message!
+  updateChat(input: UpdateChatInput!): Chat!
+  updateMessage(input: UpdateMessageInput!): ChatMessage!
+  updateOnlineStatus(defaultStatus: OnlineStatus!): User!
+  updateOwnNickname(input: UpdateNicknameInput!): Profile!
+  updateProfileDescription(description: String!): User!
+  updateProfileNickname(input: UpdateProfileNicknameInput!): Profile!
 }
 
 enum OnlineStatus {
-  ONLINE
   BUSY
-  IDLE
   DO_NOT_DISTURB
+  IDLE
   INVISIBLE
   OFFLINE
+  ONLINE
 }
 
-type UserTypePageEdge {
-  cursor: String!
-  node: User!
+type PageInfo {
+  endCursor: String!
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String!
+}
+
+type PaginatedChats {
+  currentCount: Int!
+  edges: [ChatRedisEntityPageEdge!]!
+  pageInfo: PageInfo!
+  previousCount: Int!
+}
+
+type PaginatedMessages {
+  currentCount: Int!
+  edges: [ChatMessageRedisEntityPageEdge!]!
+  pageInfo: PageInfo!
+  previousCount: Int!
+}
+
+type PaginatedProfiles {
+  currentCount: Int!
+  edges: [ProfileRedisEntityPageEdge!]!
+  pageInfo: PageInfo!
+  previousCount: Int!
 }
 
 type PaginatedUsers {
-  previousCount: Int!
   currentCount: Int!
-  edges: [UserTypePageEdge!]!
+  edges: [UserEntityPageEdge!]!
   pageInfo: PageInfo!
+  previousCount: Int!
+}
+
+type Profile {
+  chat: Chat!
+  createdAt: Timestamp!
+  endOfLife: Timestamp!
+  entityId: ID!
+  expiration: Int!
+  nickname: String!
+  slug: String!
+  time: Int!
+  updatedAt: Timestamp!
+  user: User!
+}
+
+type ProfileChange {
+  edge: ProfileRedisEntityChangeEdge!
+  type: ChangeType!
+}
+
+type ProfileRedisEntityChangeEdge {
+  cursor: String!
+  node: Profile!
+}
+
+type ProfileRedisEntityPageEdge {
+  cursor: String!
+  node: Profile!
 }
 
 type Query {
+  chatById(chatId: String!): Chat!
+  chatByInvitation(invitation: String!): Chat!
+  chatBySlug(slug: String!): Chat!
+  chatMessages(after: String, chatId: String!, first: Int = 10): PaginatedMessages!
+  chatProfiles(after: String, chatId: String!, first: Int = 10, nickname: String): PaginatedProfiles!
   me: User!
+  memberChats: [Chat!]!
+  messageById(chatId: String!, messageId: String!): ChatMessage!
+  profileById(chatId: String!, profileId: String!): Profile!
+  profileBySlug(chatId: String!, slug: String!): Profile!
+  publicChats(after: String, cursor: QueryCursor = DATE, first: Int = 10, order: QueryOrder = DESC, search: String): PaginatedChats!
+  userById(userId: String!): User!
   userByUsername(username: String!): User!
-  userById(userId: Int!): User!
-  filterUsers(cursor: QueryCursor = DATE, order: QueryOrder = DESC, after: String, first: Int = 10, search: String): PaginatedUsers!
+  userChats: [Chat!]!
+  users(after: String, cursor: QueryCursor = DATE, first: Int = 10, order: QueryOrder = DESC, search: String): PaginatedUsers!
 }
 
 enum QueryCursor {
-  DATE
   ALPHA
+  DATE
 }
 
 enum QueryOrder {
@@ -64,11 +205,55 @@ enum QueryOrder {
   DESC
 }
 
-type Mutation {
-  updateProfilePicture(picture: Upload!): User!
-  updateOnlineStatus(defaultStatus: OnlineStatus!): Message!
-  deleteAccount(password: String!): Message!
+type Subscription {
+  chatChange(chatId: String!): ChatChange!
+  messageChange(chatId: String!): MessageChange!
+  profileChange(chatId: String!): ProfileChange!
 }
 
-"""The `Upload` scalar type represents a file upload."""
-scalar Upload
+"""
+`Date` type as integer. Type represents date and time as number of milliseconds from start of UNIX epoch.
+"""
+scalar Timestamp
+
+input UpdateChatInput {
+  chatId: String!
+  chatType: ChatType
+  name: String
+}
+
+input UpdateMessageInput {
+  body: String!
+  chatId: String!
+  messageId: String!
+}
+
+input UpdateNicknameInput {
+  chatId: String!
+  nickname: String!
+}
+
+input UpdateProfileNicknameInput {
+  chatId: String!
+  nickname: String!
+  profileId: String!
+}
+
+type User {
+  createdAt: Timestamp!
+  defaultStatus: String
+  description: String
+  email: String
+  id: ID!
+  lastLogin: Timestamp!
+  lastOnline: Timestamp!
+  name: String!
+  onlineStatus: OnlineStatus!
+  updatedAt: Timestamp!
+  username: String!
+}
+
+type UserEntityPageEdge {
+  cursor: String!
+  node: User!
+}

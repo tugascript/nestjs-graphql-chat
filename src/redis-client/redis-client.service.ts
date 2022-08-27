@@ -7,7 +7,12 @@ export class RedisClientService extends Client implements OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {
     super();
     (async () => {
-      await this.open(configService.get<string>('redisUrl'));
+      try {
+        await this.open(configService.get<string>('redisUrl'));
+      } catch (e) {
+        console.log('here');
+        console.error(e);
+      }
     })();
   }
 

@@ -11,9 +11,9 @@ import { validate } from 'class-validator';
 import { Repository, Search } from 'redis-om';
 import slugify from 'slugify';
 import { v4 as uuidV4 } from 'uuid';
-import { RedisBaseEntity } from './entities/redis-base.entity';
+import { BaseRedisEntity } from './entities/base.redis-entity';
 import { AfterCursorEnum } from './enums/after-cursor.enum';
-import { NotificationTypeEnum } from './enums/notification-type.enum';
+import { ChangeTypeEnum } from './enums/change-type.enum';
 import {
   getOppositeOrder,
   getQueryOrder,
@@ -22,7 +22,7 @@ import {
   tOrderEnum,
 } from './enums/query-order.enum';
 import { IBase } from './interfaces/base.interface';
-import { INotification } from './interfaces/notification.interface';
+import { IChange } from './interfaces/change.interface';
 import { IEdge, IPaginated } from './interfaces/paginated.interface';
 
 @Injectable()
@@ -256,7 +256,7 @@ export class CommonService {
     );
   }
 
-  public async redisPagination<T extends RedisBaseEntity>(
+  public async redisPagination<T extends BaseRedisEntity>(
     cursor: keyof T,
     first: number,
     order: QueryOrderEnum,
@@ -304,14 +304,13 @@ export class CommonService {
    *
    * Generates an entity notification. This is useful for realtime apps only.
    */
-  public generateNotification<T>(
+  public generateChange<T>(
     entity: T,
-    nType: NotificationTypeEnum,
+    nType: ChangeTypeEnum,
     cursor: keyof T,
-    innerCursor?: string,
-  ): INotification<T> {
+  ): IChange<T> {
     return {
-      edge: CommonService.createEdge(entity, cursor, innerCursor),
+      edge: CommonService.createEdge(entity, cursor),
       type: nType,
     };
   }
@@ -403,19 +402,21 @@ export class CommonService {
     repo: EntityRepository<T>,
     entity: T,
     isNew = false,
+    duplicateMessage?: string,
   ): Promise<void> {
     await this.validateEntity(entity);
 
     if (isNew) repo.persist(entity);
 
-    await this.throwDuplicateError(repo.flush());
+    await this.throwDuplicateError(repo.flush(), duplicateMessage);
   }
 
-  public async saveRedisEntity<T extends RedisBaseEntity>(
+  public async saveRedisEntity<T extends BaseRedisEntity>(
     repo: Repository<T>,
     entity: T,
     expiration = 0,
   ): Promise<void> {
+    entity.updatedAt = new Date();
     await this.validateEntity(entity);
     await this.throwInternalError(repo.save(entity));
 
@@ -436,6 +437,13 @@ export class CommonService {
     await this.throwInternalError(repo.removeAndFlush(entity));
   }
 
+  public async removeRedisEntity<T extends BaseRedisEntity>(
+    repo: Repository<T>,
+    entity: T,
+  ): Promise<void> {
+    await this.throwInternalError(repo.remove(entity.entityId));
+  }
+
   //-------------------- Private Methods --------------------
 
   /**
@@ -448,7 +456,7 @@ export class CommonService {
     try {
       return await promise;
     } catch (error) {
-      if (error.code === '23505')
+      if (error.code === 11000)
         throw new ConflictException(message ?? 'Duplicated value in database');
       throw new BadRequestException(error.message);
     }

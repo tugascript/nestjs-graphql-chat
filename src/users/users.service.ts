@@ -24,23 +24,23 @@ import { getAfterCursor } from '../common/enums/after-cursor.enum';
 import { getUserQueryCursor } from '../common/enums/query-cursor.enum';
 import { IPaginated } from '../common/interfaces/paginated.interface';
 import { RedisClientService } from '../redis-client/redis-client.service';
-import { UploaderService } from '../uploader/uploader.service';
+import { DescriptionDto } from './dtos/description.dto';
 import { OnlineStatusDto } from './dtos/online-status.dto';
-import { UserEntity, userSchema } from './entities/user.entity';
+import { UserEntity } from './entities/user.entity';
+import { UserRedisEntity, userSchema } from './entities/user.redis-entity';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
   private readonly wsNamespace = this.configService.get<string>('WS_UUID');
   private readonly wsAccessTime =
     this.configService.get<number>('jwt.wsAccess.time');
-  private readonly usersRedisRepo: Repository<UserEntity>;
+  private readonly usersRedisRepo: Repository<UserRedisEntity>;
 
   constructor(
     private readonly redisClient: RedisClientService,
     @InjectRepository(UserEntity)
     private readonly usersRepository: EntityRepository<UserEntity>,
     private readonly commonService: CommonService,
-    private readonly uploaderService: UploaderService,
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
@@ -64,12 +64,13 @@ export class UsersService implements OnModuleInit {
     email,
     password1,
     password2,
-  }: RegisterDto): Promise<UserEntity> {
+  }: RegisterDto): Promise<UserRedisEntity> {
     if (password1 !== password2)
       throw new BadRequestException('Passwords do not match');
 
     name = this.commonService.formatTitle(name);
     email = email.toLowerCase();
+
     const password = await hash(password1, 10);
     let username = this.commonService.generatePointSlug(name);
 
@@ -100,8 +101,8 @@ export class UsersService implements OnModuleInit {
   public async updateDefaultStatus(
     userId: string,
     { defaultStatus }: OnlineStatusDto,
-  ): Promise<LocalMessageType> {
-    const user = await this.userById(userId);
+  ): Promise<UserRedisEntity> {
+    const user = await this.mongoUserById(userId);
     user.defaultStatus = defaultStatus;
 
     const userUuid = uuidV5(userId.toString(), this.wsNamespace);
@@ -119,7 +120,17 @@ export class UsersService implements OnModuleInit {
     }
 
     await this.saveUserToDb(user);
-    return new LocalMessageType('Default status changed successfully');
+    return this.updateRedisUser(user);
+  }
+
+  public async updateDescription(
+    userId: string,
+    { description }: DescriptionDto,
+  ): Promise<UserRedisEntity> {
+    const user = await this.mongoUserById(userId);
+    user.description = description;
+    await this.saveUserToDb(user);
+    return this.updateRedisUser(user);
   }
 
   /**
@@ -131,7 +142,7 @@ export class UsersService implements OnModuleInit {
     userId: string,
     password: string,
   ): Promise<LocalMessageType> {
-    const user = await this.userById(userId);
+    const user = await this.mongoUserById(userId);
 
     if (password.length > 1 && !(await compare(password, user.password)))
       throw new BadRequestException('Wrong password!');
@@ -141,6 +152,18 @@ export class UsersService implements OnModuleInit {
     } catch (_) {}
 
     await this.commonService.removeEntity(this.usersRepository, user);
+    const redisUser = await this.usersRedisRepo
+      .search()
+      .where('userId')
+      .equals(userId)
+      .return.first();
+
+    if (redisUser)
+      await this.commonService.removeRedisEntity(
+        this.usersRedisRepo,
+        redisUser,
+      );
+
     return new LocalMessageType('Account deleted successfully');
   }
 
@@ -164,7 +187,7 @@ export class UsersService implements OnModuleInit {
    */
   public async getUncheckUser(
     email: string,
-  ): Promise<UserEntity | undefined | null> {
+  ): Promise<UserEntity | UserRedisEntity | undefined | null> {
     const redisUser = await this.usersRedisRepo
       .search()
       .where('email')
@@ -183,7 +206,7 @@ export class UsersService implements OnModuleInit {
    */
   public async getUncheckUserById(
     id: string,
-  ): Promise<UserEntity | undefined | null> {
+  ): Promise<UserEntity | UserRedisEntity | undefined | null> {
     const redisUser = await this.usersRedisRepo
       .search()
       .where('id')
@@ -218,7 +241,7 @@ export class UsersService implements OnModuleInit {
    *
    * Gets user by id, usually the current logged-in user
    */
-  public async userById(id: string): Promise<UserEntity> {
+  public async userById(id: string): Promise<UserRedisEntity> {
     let redisUser = await this.usersRedisRepo
       .search()
       .where('id')
@@ -246,7 +269,7 @@ export class UsersService implements OnModuleInit {
    *
    * Gets user by username, usually for the profile (if it exists)
    */
-  public async userByUsername(username: string): Promise<UserEntity> {
+  public async userByUsername(username: string): Promise<UserRedisEntity> {
     let redisUser = await this.usersRedisRepo
       .search()
       .where('username')
@@ -309,10 +332,15 @@ export class UsersService implements OnModuleInit {
    * to be shared with the auth service.
    */
   public async saveUserToDb(user: UserEntity, isNew = false): Promise<void> {
-    await this.commonService.saveEntity(this.usersRepository, user, isNew);
+    await this.commonService.saveEntity(
+      this.usersRepository,
+      user,
+      isNew,
+      'Email already in use',
+    );
   }
 
-  public async updateRedisUser(user: UserEntity): Promise<UserEntity> {
+  public async updateRedisUser(user: UserEntity): Promise<UserRedisEntity> {
     const redisUser = await this.usersRedisRepo
       .search()
       .where('id')
@@ -320,20 +348,21 @@ export class UsersService implements OnModuleInit {
       .return.first();
 
     if (redisUser) {
-      for (const key in user) {
+      for (const userKey in user) {
         if (
-          redisUser.hasOwnProperty(key) &&
-          user.hasOwnProperty(key) &&
-          redisUser[key] !== user[key]
+          userKey !== '_id' &&
+          userKey !== 'toJSON' &&
+          user[userKey] &&
+          user[userKey] !== redisUser[userKey]
         ) {
-          redisUser[key] = user[key];
+          redisUser[userKey] = user[userKey];
         }
       }
 
       await this.commonService.saveRedisEntity(
         this.usersRedisRepo,
         redisUser,
-        604800,
+        86400,
       );
       return redisUser;
     }
@@ -343,7 +372,7 @@ export class UsersService implements OnModuleInit {
 
   //____________________ OTHER ____________________
 
-  private async createRedisUser(user: UserEntity): Promise<UserEntity> {
+  private async createRedisUser(user: UserEntity): Promise<UserRedisEntity> {
     const redisUser = this.usersRedisRepo.createEntity({
       id: user.id,
       name: user.name,
@@ -361,12 +390,13 @@ export class UsersService implements OnModuleInit {
       lastOnline: user.lastOnline,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      time: 86400,
     });
     await this.commonService.saveRedisEntity(
       this.usersRedisRepo,
       redisUser,
-      604800,
+      86400,
     );
-    return user;
+    return redisUser;
   }
 }

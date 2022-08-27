@@ -1,20 +1,24 @@
 import { Controller, Get, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FastifyReply } from 'fastify';
+import { Response } from 'express';
+import { Public } from './auth/decorators/public.decorator';
 
 // Because of nginx
 @Controller()
 export class AppController {
-  constructor(private readonly configService: ConfigService) {}
   private readonly port = this.configService.get<number>('port');
 
+  constructor(private readonly configService: ConfigService) {}
+
+  @Public()
   @Get()
   public getInitialRoute() {
     return `Server running on ${this.port}`;
   }
 
+  @Public()
   @Get('/favicon.ico')
-  public getFavicon(@Res() res: FastifyReply) {
-    res.sendFile('/favicon.ico');
+  public getFavicon(@Res() res: Response) {
+    res.send('/favicon.ico');
   }
 }

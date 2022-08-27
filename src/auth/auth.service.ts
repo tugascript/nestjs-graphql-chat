@@ -8,15 +8,16 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { compare, hash } from 'bcrypt';
 import { Cache } from 'cache-manager';
-import dayjs from 'dayjs';
-import { FastifyReply, FastifyRequest } from 'fastify';
+import { Request, Response } from 'express';
 import { v4 as uuidV4, v5 as uuidV5 } from 'uuid';
+import { getNowUnix } from '../chats/utils/get-now-unix.util';
 import { CommonService } from '../common/common.service';
 import { LocalMessageType } from '../common/entities/gql/message.type';
+import { IExtraUser } from '../config/interfaces/extra-user.interface';
 import { IJwt, ISingleJwt } from '../config/interfaces/jwt.interface';
-import { IWsCtx } from '../config/interfaces/ws-ctx.interface';
 import { EmailService } from '../email/email.service';
 import { UserEntity } from '../users/entities/user.entity';
+import { UserRedisEntity } from '../users/entities/user.redis-entity';
 import { OnlineStatusEnum } from '../users/enums/online-status.enum';
 import { UsersService } from '../users/users.service';
 import { ChangeEmailDto } from './dtos/change-email.dto';
@@ -101,7 +102,7 @@ export class AuthService {
    * Takes a confirmation token, confirms and updates the user
    */
   public async confirmEmail(
-    res: FastifyReply,
+    res: Response,
     { confirmationToken }: ConfirmEmailDto,
   ): Promise<IAuthResult> {
     const payload = (await this.verifyAuthToken(
@@ -130,7 +131,7 @@ export class AuthService {
    * asynchronously sends it by email. If false, it sends an auth type
    */
   public async loginUser(
-    res: FastifyReply,
+    res: Response,
     { email, password }: LoginDto,
   ): Promise<IAuthResult | LocalMessageType> {
     const user = await this.usersService.getUserForAuth(email);
@@ -176,7 +177,7 @@ export class AuthService {
    * and logins the user
    */
   public async confirmLogin(
-    res: FastifyReply,
+    res: Response,
     { email, accessCode }: ConfirmLoginDto,
   ): Promise<IAuthResult> {
     const hashedCode = await this.commonService.throwInternalError(
@@ -203,7 +204,7 @@ export class AuthService {
    *
    * Removes the refresh token from the cookies
    */
-  public logoutUser(res: FastifyReply): LocalMessageType {
+  public logoutUser(res: Response): LocalMessageType {
     res.clearCookie(this.cookieName, { path: '/api/auth/refresh-access' });
     return new LocalMessageType('Logout Successfully');
   }
@@ -217,19 +218,15 @@ export class AuthService {
    * It generates both tokens so the user can stay logged in indefinitely
    */
   public async refreshAccessToken(
-    req: FastifyRequest,
-    res: FastifyReply,
+    req: Request,
+    res: Response,
   ): Promise<IAuthResult> {
-    const token = req.cookies[this.cookieName];
+    const token: string = req.signedCookies[this.cookieName];
 
     if (!token) throw new UnauthorizedException('Invalid refresh token');
 
-    const { valid, value } = res.unsignCookie(token);
-
-    if (!valid) throw new UnauthorizedException('Invalid refresh token');
-
     const payload = (await this.verifyAuthToken(
-      value,
+      token,
       'refresh',
     )) as ITokenPayloadResponse;
     const user = await this.usersService.getUncheckUserById(payload.id);
@@ -316,7 +313,7 @@ export class AuthService {
    * Change current user email
    */
   public async updateEmail(
-    res: FastifyReply,
+    res: Response,
     userId: string,
     { email, password }: ChangeEmailDto,
   ): Promise<IAuthResult> {
@@ -347,7 +344,7 @@ export class AuthService {
    * Change current user password
    */
   public async updatePassword(
-    res: FastifyReply,
+    res: Response,
     userId: string,
     { password, password1, password2 }: ChangePasswordDto,
   ): Promise<IAuthResult> {
@@ -383,8 +380,16 @@ export class AuthService {
    */
   public async generateWsSession(
     accessToken: string,
-  ): Promise<[string, string]> {
-    const { id } = await this.verifyAuthToken(accessToken, 'access');
+  ): Promise<[string, string] | false> {
+    let id: string;
+
+    try {
+      const payload = await this.verifyAuthToken(accessToken, 'access');
+      id = payload.id;
+    } catch (_) {
+      return false;
+    }
+
     const user = await this.usersService.userById(id);
     const userUuid = uuidV5(user.id.toString(), this.wsNamespace);
     const count = user.count;
@@ -401,7 +406,7 @@ export class AuthService {
     }
 
     const sessionId = uuidV4();
-    sessionData.sessions[sessionId] = dayjs().unix();
+    sessionData.sessions[sessionId] = getNowUnix();
     await this.saveSessionData(userUuid, sessionData);
 
     return [id, sessionId];
@@ -415,7 +420,7 @@ export class AuthService {
   public async refreshUserSession({
     userId,
     sessionId,
-  }: IWsCtx): Promise<boolean> {
+  }: IExtraUser): Promise<boolean> {
     const userUuid = uuidV5(userId.toString(), this.wsNamespace);
     const sessionData = await this.commonService.throwInternalError(
       this.cacheManager.get<ISessionsData>(userUuid),
@@ -427,7 +432,7 @@ export class AuthService {
 
     if (!session) return false;
 
-    const now = dayjs().unix();
+    const now = getNowUnix();
 
     if (now - session > this.accessTime) {
       const user = await this.usersService.getUncheckUserById(userId);
@@ -455,7 +460,10 @@ export class AuthService {
    * Removes websocket session from cache, if it's the only
    * one, makes the user online status offline
    */
-  public async closeUserSession({ userId, sessionId }: IWsCtx): Promise<void> {
+  public async closeUserSession({
+    userId,
+    sessionId,
+  }: IExtraUser): Promise<void> {
     const userUuid = uuidV5(userId.toString(), this.wsNamespace);
     const sessionData = await this.commonService.throwInternalError(
       this.cacheManager.get<ISessionsData>(userUuid),
@@ -511,7 +519,9 @@ export class AuthService {
    * Sends an email for the user to confirm
    * his account after registration
    */
-  private async sendConfirmationEmail(user: UserEntity): Promise<string> {
+  private async sendConfirmationEmail(
+    user: UserEntity | UserRedisEntity,
+  ): Promise<string> {
     const emailToken = await this.generateAuthToken(
       { id: user.id, count: user.count },
       'confirmation',
@@ -532,7 +542,7 @@ export class AuthService {
   private async generateAuthTokens({
     id,
     count,
-  }: UserEntity): Promise<[string, string]> {
+  }: UserEntity | UserRedisEntity): Promise<[string, string]> {
     return Promise.all([
       this.generateAuthToken({ id }, 'access'),
       this.generateAuthToken({ id, count }, 'refresh'),
@@ -562,12 +572,12 @@ export class AuthService {
    * Saves the refresh token as a http only cookie to
    * be used for refreshing the access token
    */
-  private saveRefreshCookie(res: FastifyReply, token: string): void {
+  private saveRefreshCookie(res: Response, token: string): void {
     res.cookie(this.cookieName, token, {
       secure: !this.testing,
       httpOnly: true,
       signed: true,
-      path: '/api/auth/refresh-access',
+      path: this.testing ? '/' : '/api/auth/refresh-access',
       expires: new Date(Date.now() + this.refreshTime * 1000),
     });
   }

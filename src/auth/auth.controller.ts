@@ -1,5 +1,5 @@
 import { Body, Controller, Post, Req, Res, UseGuards } from '@nestjs/common';
-import { FastifyReply, FastifyRequest } from 'fastify';
+import { Request, Response } from 'express';
 import { LocalMessageType } from '../common/entities/gql/message.type';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -12,10 +12,10 @@ import { LoginDto } from './dtos/login.dto';
 import { RegisterDto } from './dtos/register.dto';
 import { ResetEmailDto } from './dtos/reset-email.dto';
 import { ResetPasswordDto } from './dtos/reset-password.dto';
-import { FastifyThrottlerGuard } from './guards/fastify-throttler.guard';
+import { CustomThrottlerGuard } from './guards/custom-throttler.guard';
 
 @Controller('api/auth')
-@UseGuards(FastifyThrottlerGuard)
+@UseGuards(CustomThrottlerGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -30,7 +30,7 @@ export class AuthController {
   @Public()
   @Post('/confirm-email')
   public async confirmEmail(
-    @Res() res: FastifyReply,
+    @Res() res: Response,
     @Body() confirmEmailDto: ConfirmEmailDto,
   ): Promise<void> {
     const result = await this.authService.confirmEmail(res, confirmEmailDto);
@@ -40,7 +40,7 @@ export class AuthController {
   @Public()
   @Post('/login')
   public async loginUser(
-    @Res() res: FastifyReply,
+    @Res() res: Response,
     @Body() loginDto: LoginDto,
   ): Promise<void> {
     const result = await this.authService.loginUser(res, loginDto);
@@ -50,22 +50,15 @@ export class AuthController {
   @Public()
   @Post('/confirm-login')
   public async confirmLogin(
-    @Res() res: FastifyReply,
+    @Res() res: Response,
     @Body() confirmLoginDto: ConfirmLoginDto,
   ): Promise<void> {
     const result = await this.authService.confirmLogin(res, confirmLoginDto);
     res.status(200).send(result);
   }
 
-  @Post('/confirm-credentials')
-  public async confirmCredentials(
-    @CurrentUser() userId: number,
-  ): Promise<LocalMessageType> {
-    return this.authService.confirmCredentials(userId);
-  }
-
   @Post('/logout')
-  public logoutUser(@Res() res: FastifyReply): void {
+  public logoutUser(@Res() res: Response): void {
     const message = this.authService.logoutUser(res);
     res.status(200).send(message);
   }
@@ -73,8 +66,8 @@ export class AuthController {
   @Public()
   @Post('/refresh-access')
   public async refreshAccessToken(
-    @Req() req: FastifyRequest,
-    @Res() res: FastifyReply,
+    @Req() req: Request,
+    @Res() res: Response,
   ): Promise<void> {
     const result = await this.authService.refreshAccessToken(req, res);
     res.status(200).send(result);
@@ -98,15 +91,15 @@ export class AuthController {
 
   @Post('/toggle-two-factor')
   public async changeTwoFactorAuth(
-    @CurrentUser() userId: number,
+    @CurrentUser() userId: string,
   ): Promise<LocalMessageType> {
     return this.authService.changeTwoFactorAuth(userId);
   }
 
   @Post('/update-email')
   public async updateEmail(
-    @Res() res: FastifyReply,
-    @CurrentUser() userId: number,
+    @Res() res: Response,
+    @CurrentUser() userId: string,
     @Body() changeEmailDto: ChangeEmailDto,
   ): Promise<void> {
     const result = await this.authService.updateEmail(
@@ -119,8 +112,8 @@ export class AuthController {
 
   @Post('/update-password')
   public async updatePassword(
-    @Res() res: FastifyReply,
-    @CurrentUser() userId: number,
+    @Res() res: Response,
+    @CurrentUser() userId: string,
     @Body() changePasswordDto: ChangePasswordDto,
   ): Promise<void> {
     const result = await this.authService.updatePassword(

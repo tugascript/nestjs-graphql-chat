@@ -1,35 +1,18 @@
-version: '3.7'
+version: '3.8'
 services:
-  redis:
-    container_name: redis
-    image: 'redis:alpine'
-    command: redis-server --requirepass password
+  redis-stack:
+    container_name: redis-stack
+    image: 'redis/redis-stack:latest'
     ports:
       - '6379:6379'
 
-  redis-commander:
-    container_name: redis-comander
-    image: rediscommander/redis-commander:latest
-    environment:
-      - REDIS_HOSTS=local:redis:6379
-      - REDIS_PASSWORD=password
+  mongo:
+    container_name: mongo
+    image: 'mongo:latest'
     ports:
-      - '8081:8081'
-    depends_on:
-      - redis
+      - '27017:27017'
+    volumes:
+      - 'mongodb_data_container:/data/db'
 
-  postgres:
-    container_name: postgres
-    image: postgres:latest
-    ports:
-      - '5432:5432'
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: general
-    networks:
-      - postgres
-
-networks:
-  postgres:
-    driver: bridge
+volumes:
+  mongodb_data_container:

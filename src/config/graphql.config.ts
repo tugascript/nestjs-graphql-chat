@@ -1,119 +1,79 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GqlOptionsFactory } from '@nestjs/graphql';
-import AltairFastify, {
-  AltairFastifyPluginOptions,
-} from 'altair-fastify-plugin';
-import { GraphQLError } from 'graphql';
+import { BaseRedisCache } from 'apollo-server-cache-redis';
+import responseCachePlugin from 'apollo-server-plugin-response-cache';
+import { Context } from 'graphql-ws';
 import Redis, { RedisOptions } from 'ioredis';
-import mercuriusCache, { MercuriusCacheOptions } from 'mercurius-cache';
-import mqRedis from 'mqemitter-redis';
 import { AuthService } from '../auth/auth.service';
-import { IGqlCtx } from '../common/interfaces/gql-ctx.interface';
-import { MercuriusDriverPlugin } from './interfaces/mercurius-driver-plugin.interface';
-import { MercuriusExtendedDriverConfig } from './interfaces/mercurius-extended-driver-config.interface';
-import { IWsCtx } from './interfaces/ws-ctx.interface';
-import { IWsParams } from './interfaces/ws-params.interface';
-import { LoadersService } from '../loaders/loaders.service';
+import { IExtra } from './interfaces/extra.interface';
 
 @Injectable()
 export class GqlConfigService implements GqlOptionsFactory {
-  private readonly testing = this.configService.get<boolean>('testing');
   private readonly redisOpt = this.configService.get<RedisOptions>('redis');
+  private readonly testing = this.configService.get<boolean>('testing');
 
   constructor(
     private readonly configService: ConfigService,
     private readonly authService: AuthService,
-    private readonly loadersService: LoadersService,
   ) {}
 
-  public createGqlOptions(): MercuriusExtendedDriverConfig {
-    const plugins: MercuriusDriverPlugin[] = [
-      {
-        plugin: mercuriusCache,
-        options: {
-          ttl: 60,
-          all: true,
-          storage: this.testing
-            ? {
-                type: 'memory',
-                options: {
-                  size: 1024,
-                },
-              }
-            : {
-                type: 'redis',
-                options: {
-                  client: new Redis(this.redisOpt),
-                  size: 2048,
-                },
-              },
-        } as MercuriusCacheOptions,
-      },
-    ];
-
-    if (this.testing) {
-      plugins.push({
-        plugin: AltairFastify,
-        options: {
-          path: '/altair',
-          baseURL: '/altair/',
-          endpointURL: '/api/graphql',
-        } as AltairFastifyPluginOptions,
-      });
-    }
-
+  public createGqlOptions(): ApolloDriverConfig {
     return {
-      graphiql: false,
-      ide: false,
+      driver: ApolloDriver,
+      context: (all) => all,
       path: '/api/graphql',
-      routes: true,
-      subscription: {
-        fullWsTransport: true,
-        emitter: this.testing
-          ? undefined
-          : mqRedis({
-              port: this.redisOpt.port,
-              host: this.redisOpt.host,
-              password: this.redisOpt.password,
-            }),
-        onConnect: async (info): Promise<{ ws: IWsCtx } | false> => {
-          const { authorization }: IWsParams = info.payload;
-
-          if (!authorization) return false;
-
-          const authArr = authorization.split(' ');
-
-          if (authArr[0] !== 'Bearer') return false;
-
-          try {
-            const [userId, sessionId] =
-              await this.authService.generateWsSession(authArr[1]);
-            return { ws: { userId, sessionId } };
-          } catch (_) {
-            return false;
-          }
-        },
-        onDisconnect: async (ctx) => {
-          const { ws } = ctx as IGqlCtx;
-
-          if (!ws) return;
-
-          await this.authService.closeUserSession(ws);
-        },
-      },
       autoSchemaFile: './schema.gql',
-      errorFormatter: (error) => {
-        const org = error.errors[0].originalError as HttpException;
-        return {
-          statusCode: org.getStatus(),
-          response: {
-            errors: [org.getResponse() as GraphQLError],
-            data: null,
-          },
-        };
+      debug: this.configService.get<boolean>('testing'),
+      sortSchema: true,
+      bodyParserConfig: false,
+      playground: this.testing,
+      plugins: [responseCachePlugin()],
+      cors: {
+        origin: this.configService.get<string>('url'),
+        credentials: true,
       },
-      plugins,
+      cache: new BaseRedisCache({
+        client: new Redis(this.redisOpt),
+      }),
+      subscriptions: {
+        'graphql-ws': {
+          onConnect: async (
+            ctx: Context<{ authorization?: string }, IExtra>,
+          ) => {
+            const authHeader = ctx?.connectionParams?.authorization;
+
+            if (!authHeader) return false;
+
+            const authArr = authHeader.split(' ');
+
+            if (authArr.length !== 2 || authArr[0] !== 'Bearer') return false;
+
+            const result = await this.authService.generateWsSession(authArr[1]);
+
+            if (!result) return false;
+
+            const [userId, sessionId] = result;
+
+            ctx.extra.user = {
+              userId,
+              sessionId,
+            };
+            return true;
+          },
+          onSubscribe: async (
+            ctx: Context<{ authorization?: string }, IExtra>,
+            message,
+          ) => {
+            ctx.extra.payload = message.payload;
+          },
+          onClose: async (ctx: Context<{ authorization?: string }, IExtra>) => {
+            if (ctx.extra?.user)
+              await this.authService.closeUserSession(ctx.extra.user);
+          },
+        },
+      },
     };
   }
 }
