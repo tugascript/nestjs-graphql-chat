@@ -1,17 +1,20 @@
-import { Field, ObjectType } from '@nestjs/graphql';
+import { Field, Int, ObjectType } from '@nestjs/graphql';
 import {
   IsBase64,
   IsEnum,
+  IsInt,
   IsString,
   IsUUID,
   Length,
   Matches,
+  Max,
+  Min,
 } from 'class-validator';
 import { Schema } from 'redis-om';
 import { NAME_REGEX, SLUG_REGEX } from '../../common/constants/regex';
 import { RedisBaseEntity } from '../../common/entities/redis-base.entity';
 import { ChatTypeEnum } from '../enums/chat-type.enum';
-import { getNowUnix } from '../utils/get-now-unix.util';
+import { getNowUnix, getUnix } from '../utils/get-now-unix.util';
 
 @ObjectType('Chat')
 export class ChatEntity extends RedisBaseEntity {
@@ -20,6 +23,12 @@ export class ChatEntity extends RedisBaseEntity {
   @Length(3, 100)
   @Matches(NAME_REGEX)
   public name: string;
+
+  @Field(() => Int)
+  @IsInt()
+  @Min(300)
+  @Max(86400)
+  public time: number;
 
   @Field(() => String)
   @IsString()
@@ -45,7 +54,7 @@ export class ChatEntity extends RedisBaseEntity {
   public chatKey: string;
 
   public endOfLife(): number {
-    return Math.floor((this.createdAt.getTime() + 86400000) / 1000);
+    return getUnix(this.createdAt) + this.time;
   }
 
   public expiration(): number {
@@ -56,6 +65,7 @@ export class ChatEntity extends RedisBaseEntity {
 export const chatSchema = new Schema(ChatEntity, {
   name: { type: 'string' },
   slug: { type: 'string' },
+  time: { type: 'number' },
   invitation: { type: 'string' },
   userId: { type: 'string' },
   chatKey: { type: 'string' },

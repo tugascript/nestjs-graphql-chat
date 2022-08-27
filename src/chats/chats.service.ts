@@ -56,7 +56,7 @@ export class ChatsService implements OnModuleInit {
   public async createChat(
     pubsub: PubSub,
     userId: string,
-    { name, chatType }: CreateChatInput,
+    { name, chatType, time }: CreateChatInput,
   ): Promise<ChatEntity> {
     name = this.commonService.formatTitle(name);
     let slug = this.commonService.generatePointSlug(name);
@@ -73,6 +73,7 @@ export class ChatsService implements OnModuleInit {
       slug,
       chatType,
       userId,
+      time: time * 60,
       chatKey: await this.encryptionService.generateChatKey(),
       invitation: uuidV4(),
     });

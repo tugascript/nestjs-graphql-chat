@@ -1,5 +1,13 @@
-import { Field, InputType } from '@nestjs/graphql';
-import { IsEnum, IsString, Length, Matches } from 'class-validator';
+import { Field, InputType, Int } from '@nestjs/graphql';
+import {
+  IsEnum,
+  IsInt,
+  IsString,
+  Length,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
 import { NAME_REGEX } from '../../common/constants/regex';
 import { ChatTypeEnum } from '../enums/chat-type.enum';
 
@@ -16,4 +24,10 @@ export abstract class CreateChatInput {
   @Field(() => ChatTypeEnum)
   @IsEnum(ChatTypeEnum)
   public chatType: ChatTypeEnum;
+
+  @Field(() => Int)
+  @IsInt()
+  @Min(5)
+  @Max(1440)
+  public time: number;
 }
