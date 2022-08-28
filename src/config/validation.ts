@@ -3,7 +3,7 @@ import Joi from 'joi';
 export const validationSchema = Joi.object({
   NODE_ENV: Joi.string().required(),
   PORT: Joi.number().required(),
-  FRONTEND_URL: Joi.string().required(),
+  URL: Joi.string().required(),
   DATABASE_URL: Joi.string().required(),
   JWT_ACCESS_SECRET: Joi.string().required(),
   JWT_ACCESS_TIME: Joi.number().required(),
@@ -27,4 +27,5 @@ export const validationSchema = Joi.object({
   THROTTLE_TTL: Joi.number().required(),
   THROTTLE_LIMIT: Joi.number().required(),
   MASTER_KEY: Joi.string().required(),
+  MASTER_PASSWORD: Joi.string().required(),
 });

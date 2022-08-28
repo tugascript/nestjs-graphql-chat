@@ -2,7 +2,7 @@ export const loginConfirmationEmail = (name: string, code: string) => `
 <body>
   <p>Hello ${name},</p>
   <br />
-  <p>Welcome back to [Your app],</p>
+  <p>Welcome back to Ephemeral Chats,</p>
   <p>
     Here's your login code:
     <b>${code}</b>
@@ -12,6 +12,6 @@ export const loginConfirmationEmail = (name: string, code: string) => `
   </p>
   <br />
   <p>Best regards,</p>
-  <p>[Your app] Team</p>
+  <p>Afonso Barracha</p>
 </body>
 `;

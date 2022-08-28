@@ -1,0 +1,34 @@
+{
+  "app_name": "Ephemeral Chat",
+  "description": "A real-time app for ephemeral chat rooms",
+  "type": "Back-End API",
+  "contributed_by": "Community",
+  "repo_url": "https://github.com/tugascript/nestjs-graphql-chat",
+  "download_url": "https://github.com/tugascript/nestjs-graphql-chat/archive/refs/heads/master.zip",
+  "hosted_url": "https://chat.tugascript.com",
+  "language": [
+    "TypeScript",
+    "GraphQL"
+  ],
+  "redis_features": [
+    "caching",
+    "pubsub",
+    "database storage"
+  ],
+  "redis_modules": [
+    "RediJSON",
+    "RediSearch"
+  ],
+  "app_image_urls": [
+  ],
+  "youtube_url": "",
+  "special_tags": [
+    "Hackathon",
+    "Redis Hackathon",
+    "dev.to"
+  ],
+  "verticals": [
+    "Social",
+    "Messaging"
+  ]
+}

@@ -1,13 +1,5 @@
-import { Field, Int, ObjectType } from '@nestjs/graphql';
-import {
-  IsInt,
-  IsMongoId,
-  IsString,
-  Length,
-  Matches,
-  Max,
-  Min,
-} from 'class-validator';
+import { Field, ObjectType } from '@nestjs/graphql';
+import { IsMongoId, IsString, Length, Matches } from 'class-validator';
 import { Schema } from 'redis-om';
 import {
   NAME_REGEX,
@@ -30,12 +22,6 @@ export class ProfileRedisEntity extends BaseRedisEntity {
   @Length(3, 109)
   @Matches(SLUG_REGEX)
   public slug: string;
-
-  @Field(() => Int)
-  @IsInt()
-  @Min(1)
-  @Max(86400)
-  public time: number;
 
   @IsString()
   @IsMongoId()

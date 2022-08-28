@@ -1,109 +1,96 @@
-# NestJS GraphQL Boilerplate
+# Ephemeral Chats
 
 ## Description
 
-Full boilerplate of a NestJS, GraphQL and PostgreSQL (with Mikro-ORM) monolithic backend app.
-It implements:
+Ephemeral Chats is a TypeScript NodeJS app made with [NestJS](https://nestjs.com/)
+, [Apollo GraphQL](https://www.apollographql.com/docs/apollo-server/), [RedisOM](https://github.com/redis/redis-om-node)
+and [MikroORM](https://mikro-orm.io/).
 
-- Configuration (adds most used config classes):
+It's a real-time web app where you can build temporary chat rooms, from 5 minutes to 24 hours, to chat with your
+friends, or anyone you invite into the room.
 
-*
-    - Cache with Redis
-*
-    - GraphQL with subscriptions and GraphQL through Websockets
-*
-    - MikroORM with SQLite in development and PostgreSQL in production
+## Video Overview
 
-- Authentication:
+@todo: Upload Video to YouTube
 
-*
-    - JWT Authentication for HTTP
-*
-    - Custom Session Authentication for Websockets (based on Facebook Messenger Design)
-*
-    - Two-Factor authentication with email
+## How it works
 
-- Uploader:
+#### Databases:
 
-*
-    - Basic image only uploader with Sharp optimizations for a generic S3 Bucket
+In terms of databases there are two main ones:
 
-- Pagination:
+- [MongoDB](https://www.mongodb.com/)
+- [Redis](https://redis.io/)
 
-*
-    - Has the generics for Edges and Paginated types
-*
-    - Relay cursor pagination function
+The MongoDB database is used to store the data that needs to be persisted, mainly the Users as we need them for Auth. I
+chose MongoDB as I wanted to save everything as a JSON Object to go with the hackathon theme Redis, but I still wanted
+some assurances that the data would be persisted and any database transaction wouldn't be lost, so I chose MongoDB, a
+NoSQL database that since version 4 has
+some [ACID transaction features](https://www.mongodb.com/basics/acid-transactions).
 
-## Installation
+Since most of the data is ephemeral, we don't need to persist it, so we use Redis and RedisJSON for the rest: Chat
+Rooms, Profiles and Messages.
+
+#### Class Diagram:
+
+[![Class Diagram](class-diagram.jpg)](class-diagram.drawio)
+
+### How the data is stored:
+
+- Users are stored in MongoDB as a JSON Object, with a unique ID and a hashed password. Everytime a User Instance is
+  accessed its stored on Redis for 24h to boost read speeds.
+- Chat Rooms are stored in Redis as a RediJSON Object with a TTL (Time To Live) of 5 minutes to 24 hours.
+- Profiles are stored in Redis as a RediJSON Object with TTL equal to the Chat Room's TTL.
+- Messages are stored in Redis as a RediJSON Object with a TTL equal to the Chat Room's TTL.
+
+### How the data is accessed:
+
+- Most of the data is access with Redis' Search, using indexes and queries to get the data we need.
+- Single users are fetched from Redis as they'll be stored there for 24h. However, multiple users will still be fetched
+  from MongoDB.
+- When fetching multiple entities, I cursor paginate them, including when using Redis' Search.
+
+## How to run it locally
+
+### Prerequisites:
+
+- Docker or Podman;
+- Docker-compose or Podman-compose;
+- NodeJS 16 with corepack enabled.
+
+### Steps:
+
+1. Clone the repo.
+2. Install the dependencies:
 
 ```bash
 $ yarn install
 ```
 
-## Database Migrations
+3. Create a .env file with all the fields equal to the [example](.env.example).
+4. Start the containers:
 
 ```bash
-# creation
-$ yarn migrate:create
-# update
-$ yarn migrate:update
+$ podman-compose up
 ```
 
-## Running the app
+5. Start the app once:
 
 ```bash
-# production mode
-$ yarn start
-
-# watch mode
 $ yarn start:dev
-
-# debug mode
-$ yarn start:debug
 ```
 
-## Unit Testing
-
-### BEFORE EACH TEST (Individual or All):
-
-- Check if NODE_ENV is not production
-- Remove the current test.db
-- Create a new test.db
+6. Copy the generated MASTER_KEY that appears in the console and paste it in the .env file.
+7. Start the app again:
 
 ```bash
-# remove test.db
-$ rm test.db
-# create a new test.db
-$ yarn migrate:create
+$ yarn start:dev
 ```
 
-### All tests:
+## Deployment
 
-```bash
-# unit tests
-$ yarn run test  --detectOpenHandles
-```
-
-### Individual test:
-
-```bash
-# unit tests
-$ yarn run test service-name.service.spec.ts --detectOpenHandles
-```
-
-## Support the frameworks used in this template
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If
-you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-Mikro-ORM is a TypeScript ORM for Node.js based on Data Mapper, Unit of Work and Identity Map patterns. If you like
-MikroORM, give it a [star](https://github.com/mikro-orm/mikro-orm) on GitHub and
-consider [sponsoring](https://github.com/sponsors/B4nan) its development!
-
-[Sharp](https://github.com/lovell/sharp) is a high performance Node.js image processor. If you want
-to [support them.](https://opencollective.com/libvips)
+@todo: Add deployment instructions for Dokku and DigitalOcean.
 
 ## License
 
-This template is [MIT licensed](LICENSE).
+This project is [MIT licensed](LICENSE).

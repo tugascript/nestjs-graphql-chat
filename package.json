@@ -1,6 +1,6 @@
 {
-  "name": "backend",
-  "version": "0.0.1",
+  "name": "ephemeral-chats",
+  "version": "1.0.0",
   "description": "NestJS & Mercurius Monolith Back-End Template",
   "author": "Afonso Barracha",
   "private": true,
@@ -17,9 +17,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
-    "migrate:create": "npx mikro-orm schema:create --run",
-    "migrate:update": "npx mikro-orm schema:update --run"
+    "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
     "@fastify/cookie": "^8.0.0",
