@@ -20,7 +20,6 @@ import { UserEntity } from '../users/entities/user.entity';
 import { UserRedisEntity } from '../users/entities/user.redis-entity';
 import { OnlineStatusEnum } from '../users/enums/online-status.enum';
 import { UsersService } from '../users/users.service';
-import { ChangeEmailDto } from './dtos/change-email.dto';
 import { ChangePasswordDto } from './dtos/change-password.input';
 import { ConfirmEmailDto } from './dtos/confirm-email.dto';
 import { ConfirmLoginDto } from './dtos/confirm-login.dto';
@@ -205,7 +204,9 @@ export class AuthService {
    * Removes the refresh token from the cookies
    */
   public logoutUser(res: Response): LocalMessageType {
-    res.clearCookie(this.cookieName, { path: '/api/auth/refresh-access' });
+    res.clearCookie(this.cookieName, {
+      path: this.testing ? '/' : '/api/auth/refresh-access',
+    });
     return new LocalMessageType('Logout Successfully');
   }
 
@@ -315,7 +316,7 @@ export class AuthService {
   public async updateEmail(
     res: Response,
     userId: string,
-    { email, password }: ChangeEmailDto,
+    { email, password }: LoginDto,
   ): Promise<IAuthResult> {
     const user = await this.usersService.mongoUserById(userId);
 
@@ -390,7 +391,7 @@ export class AuthService {
       return false;
     }
 
-    const user = await this.usersService.userById(id);
+    const user = await this.usersService.mongoUserById(id);
     const userUuid = uuidV5(user.id.toString(), this.wsNamespace);
     const count = user.count;
     let sessionData = await this.commonService.throwInternalError(
@@ -403,6 +404,8 @@ export class AuthService {
         count,
       };
       user.onlineStatus = user.defaultStatus;
+      await this.usersService.saveUserToDb(user);
+      await this.usersService.updateRedisUser(user);
     }
 
     const sessionId = uuidV4();

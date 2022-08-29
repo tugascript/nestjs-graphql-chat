@@ -1,4 +1,4 @@
-import { Field, GraphQLTimestamp, ID, Int, ObjectType } from '@nestjs/graphql';
+import { Field, ID, Int, ObjectType } from '@nestjs/graphql';
 import {
   IsDate,
   IsInt,
@@ -26,11 +26,11 @@ export abstract class BaseRedisEntity extends Entity {
   @Max(86400)
   public time: number;
 
-  @Field(() => GraphQLTimestamp)
+  @Field(() => String)
   @IsDate()
   public createdAt: Date = new Date();
 
-  @Field(() => GraphQLTimestamp)
+  @Field(() => String)
   @IsDate()
   public updatedAt: Date = new Date();
 

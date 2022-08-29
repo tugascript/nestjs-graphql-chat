@@ -11,12 +11,6 @@ export class AppController {
   constructor(private readonly configService: ConfigService) {}
 
   @Public()
-  @Get()
-  public getInitialRoute() {
-    return `Server running on ${this.port}`;
-  }
-
-  @Public()
   @Get('/favicon.ico')
   public getFavicon(@Res() res: Response) {
     res.send('/favicon.ico');

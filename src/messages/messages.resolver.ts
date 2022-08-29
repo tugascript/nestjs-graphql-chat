@@ -1,7 +1,6 @@
 import { Inject } from '@nestjs/common';
 import {
   Args,
-  GraphQLTimestamp,
   Int,
   Mutation,
   Parent,
@@ -111,7 +110,7 @@ export class MessagesResolver {
     return this.chatsService.uncheckedChatById(message.chatId);
   }
 
-  @ResolveField('endOfLife', () => GraphQLTimestamp)
+  @ResolveField('endOfLife', () => String)
   public resolveEndOfLife(@Parent() message: ChatMessageRedisEntity): Date {
     return new Date(message.endOfLife() * 1000);
   }

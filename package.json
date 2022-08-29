@@ -20,10 +20,12 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@apollo/utils.keyvadapter": "^1.1.2",
     "@fastify/cookie": "^8.0.0",
     "@fastify/cors": "^8.1.0",
     "@fastify/csrf-protection": "^5.1.0",
     "@fastify/static": "^6.5.0",
+    "@keyv/redis": "^2.5.0",
     "@mikro-orm/core": "^5.3.1",
     "@mikro-orm/mongodb": "^5.3.1",
     "@mikro-orm/nestjs": "^5.1.1",
@@ -36,7 +38,6 @@
     "@nestjs/serve-static": "^3.0.0",
     "@nestjs/throttler": "^3.0.0",
     "altair-express-middleware": "^4.6.4",
-    "apollo-server-cache-redis": "^3.3.1",
     "apollo-server-express": "^3.10.2",
     "apollo-server-plugin-response-cache": "^3.7.0",
     "bcrypt": "^5.0.1",
@@ -51,6 +52,7 @@
     "ioredis": "^5.2.3",
     "joi": "^17.6.0",
     "jsonwebtoken": "^8.5.1",
+    "keyv": "^4.4.1",
     "nestjs-throttler-storage-redis": "^0.1.20",
     "nodemailer": "^6.7.8",
     "redis-om": "^0.3.6",

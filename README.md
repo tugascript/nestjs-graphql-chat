@@ -89,7 +89,55 @@ $ yarn start:dev
 
 ## Deployment
 
-@todo: Add deployment instructions for Dokku and DigitalOcean.
+### Steps:
+
+1. Go to [DigitalOcean](https://www.digitalocean.com/), [Linode](https://www.linode.com/)
+   or [Hetzner](https://www.hetzner.com/);
+2. Create a server running [Ubuntu LTS](https://ubuntu.com/);
+3. Install [dokku](https://dokku.com/docs~v0.28.1/getting-started/installation/#1-install-dokku);
+4. Run the following commands on your server for dokku initial set-up:
+
+```bash
+$ cat ~/.ssh/authorized_keys | dokku ssh-keys:add admin
+$ dokku domains:set-global your-global-domain.com
+```
+
+5. Create a new app and connect git:
+
+```bash
+$ dokku apps:create ephemeral-chats
+```
+
+6. Go to [redis cloud](https://redis.com/try-free/) and create a new instance with RediJSON and RediSearch;
+7. Add the [Mongo plugin](https://github.com/dokku/dokku-mongo) to dokku, and create a new instance of MongoDB:
+
+```bash
+$ dokku mongo:create ephemeral-chasts-db
+$ dokku mongo:link ephemeral-chats-db ephemeral-chats
+```
+
+8. Add all the configurations:
+
+```bash
+$ dokku config:set ephemeral-chats REDIS_HOST=redis ...
+```
+
+9On your pc clone this repo and on its folder run the following commands:
+
+```bash
+$ git remote add dokku dokku@your-global-domain.com:ephemeral-chats
+$ git push dokku main:master
+```
+
+10. Finally set up SSL and a domain for your app:
+
+```bash
+$ sudo dokku plugin:install https://github.com/dokku/dokku-letsencrypt.git
+$ dokku config:set --global DOKKU_LETSENCRYPT_EMAIL=your-email@your.domain.com
+$ dokku domains:set ephemeral-chats chats.your.domain.com
+$ dokku letsencrypt:enable ephemeral-chats
+$ dokku letsencrypt:cron-job --add 
+```
 
 ## License
 

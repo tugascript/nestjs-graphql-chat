@@ -1,7 +1,6 @@
 import { Inject } from '@nestjs/common';
 import {
   Args,
-  GraphQLTimestamp,
   Int,
   Mutation,
   Parent,
@@ -12,6 +11,7 @@ import {
 } from '@nestjs/graphql';
 import { RedisPubSub } from 'graphql-redis-subscriptions';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { Public } from '../../auth/decorators/public.decorator';
 import { SearchDto } from '../../common/dtos/search.dto';
 import { SlugDto } from '../../common/dtos/slug.dto';
 import { LocalMessageType } from '../../common/entities/gql/message.type';
@@ -35,9 +35,11 @@ import { ChatChangeType } from '../entities/gql/chat-change.type';
 import { PaginatedChatsType } from '../entities/gql/paginated-chats.type';
 import { PaginatedProfilesType } from '../entities/gql/paginated-profiles.type';
 import { ProfileRedisEntity } from '../entities/profile.redis-entity';
+import { ChatTypeEnum } from '../enums/chat-type.enum';
 import { CreateChatInput } from '../inputs/create-chat.input';
 import { UpdateChatInput } from '../inputs/update-chat.input';
 import { IChatChange } from '../interfaces/chat-change.interface';
+import { IPublicChatChange } from '../interfaces/public-chat-change.interface';
 
 @Resolver(() => ChatRedisEntity)
 export class ChatsResolver {
@@ -80,6 +82,7 @@ export class ChatsResolver {
     return this.chatsService.chatBySlug(userId, dto.slug);
   }
 
+  @Public()
   @Query(() => ChatRedisEntity)
   public async chatByInvitation(
     @Args() dto: InvitationDto,
@@ -134,6 +137,17 @@ export class ChatsResolver {
     );
   }
 
+  @Subscription(() => ChatChangeType, {
+    filter: (payload: IPublicChatChange) => {
+      return (
+        payload.publicChatChange.edge.node.chatType === ChatTypeEnum.PUBLIC
+      );
+    },
+  })
+  public async publicChatChange() {
+    return this.pubsub.asyncIterator<IPublicChatChange>('PUBLIC_CHAT');
+  }
+
   @ResolveField('profiles', () => PaginatedProfilesType)
   public async resolveProfiles(
     @Parent() chat: ChatRedisEntity,
@@ -162,7 +176,17 @@ export class ChatsResolver {
     return this.chatsService.countProfiles(chat.entityId);
   }
 
-  @ResolveField('endOfLife', () => GraphQLTimestamp)
+  @ResolveField('isMember', () => Boolean)
+  public async resolveIsMember(
+    @CurrentUser() userId: string,
+    @Parent() chat: ChatRedisEntity,
+  ): Promise<boolean> {
+    return userId
+      ? await this.chatsService.checkProfileExistence(userId, chat.entityId)
+      : false;
+  }
+
+  @ResolveField('endOfLife', () => String)
   public resolveEndOfLife(@Parent() chat: ChatRedisEntity): Date {
     return new Date(chat.endOfLife() * 1000);
   }

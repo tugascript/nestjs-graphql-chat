@@ -5,7 +5,7 @@ import {
   SerializedPrimaryKey,
 } from '@mikro-orm/core';
 import { ObjectId } from '@mikro-orm/mongodb';
-import { Field, GraphQLTimestamp, ID, ObjectType } from '@nestjs/graphql';
+import { Field, ID, ObjectType } from '@nestjs/graphql';
 import { IBase } from '../interfaces/base.interface';
 
 @ObjectType({ isAbstract: true })
@@ -18,11 +18,11 @@ export abstract class LocalBaseEntity implements IBase {
   @SerializedPrimaryKey()
   public id: string;
 
-  @Field(() => GraphQLTimestamp)
+  @Field(() => String)
   @Property({ onCreate: () => new Date() })
   public createdAt: Date = new Date();
 
-  @Field(() => GraphQLTimestamp)
+  @Field(() => String)
   @Property({ onUpdate: () => new Date() })
   public updatedAt: Date = new Date();
 }

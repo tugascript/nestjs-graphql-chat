@@ -4,7 +4,6 @@ import { LocalMessageType } from '../common/entities/gql/message.type';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
-import { ChangeEmailDto } from './dtos/change-email.dto';
 import { ChangePasswordDto } from './dtos/change-password.input';
 import { ConfirmEmailDto } from './dtos/confirm-email.dto';
 import { ConfirmLoginDto } from './dtos/confirm-login.dto';
@@ -31,9 +30,9 @@ export class AuthController {
   @Post('/confirm-email')
   public async confirmEmail(
     @Res() res: Response,
-    @Body() confirmEmailDto: ConfirmEmailDto,
+    @Body() dto: ConfirmEmailDto,
   ): Promise<void> {
-    const result = await this.authService.confirmEmail(res, confirmEmailDto);
+    const result = await this.authService.confirmEmail(res, dto);
     res.status(200).send(result);
   }
 
@@ -41,9 +40,9 @@ export class AuthController {
   @Post('/login')
   public async loginUser(
     @Res() res: Response,
-    @Body() loginDto: LoginDto,
+    @Body() dto: LoginDto,
   ): Promise<void> {
-    const result = await this.authService.loginUser(res, loginDto);
+    const result = await this.authService.loginUser(res, dto);
     res.status(200).send(result);
   }
 
@@ -51,9 +50,9 @@ export class AuthController {
   @Post('/confirm-login')
   public async confirmLogin(
     @Res() res: Response,
-    @Body() confirmLoginDto: ConfirmLoginDto,
+    @Body() dto: ConfirmLoginDto,
   ): Promise<void> {
-    const result = await this.authService.confirmLogin(res, confirmLoginDto);
+    const result = await this.authService.confirmLogin(res, dto);
     res.status(200).send(result);
   }
 
@@ -100,13 +99,9 @@ export class AuthController {
   public async updateEmail(
     @Res() res: Response,
     @CurrentUser() userId: string,
-    @Body() changeEmailDto: ChangeEmailDto,
+    @Body() dto: LoginDto,
   ): Promise<void> {
-    const result = await this.authService.updateEmail(
-      res,
-      userId,
-      changeEmailDto,
-    );
+    const result = await this.authService.updateEmail(res, userId, dto);
     res.status(200).send(result);
   }
 
@@ -114,13 +109,9 @@ export class AuthController {
   public async updatePassword(
     @Res() res: Response,
     @CurrentUser() userId: string,
-    @Body() changePasswordDto: ChangePasswordDto,
+    @Body() dto: ChangePasswordDto,
   ): Promise<void> {
-    const result = await this.authService.updatePassword(
-      res,
-      userId,
-      changePasswordDto,
-    );
+    const result = await this.authService.updatePassword(res, userId, dto);
     res.status(200).send(result);
   }
 }

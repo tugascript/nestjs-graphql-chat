@@ -1,7 +1,6 @@
 import { Inject } from '@nestjs/common';
 import {
   Args,
-  GraphQLTimestamp,
   Int,
   Mutation,
   Parent,
@@ -124,7 +123,7 @@ export class ProfilesResolver {
     );
   }
 
-  @ResolveField('endOfLife', () => GraphQLTimestamp)
+  @ResolveField('endOfLife', () => String)
   public resolveEndOfLife(@Parent() profile: ProfileRedisEntity): Date {
     return new Date(profile.endOfLife() * 1000);
   }

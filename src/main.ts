@@ -16,17 +16,12 @@ async function bootstrap() {
   app.use(json());
   app.use(cookieParser(configService.get<string>('COOKIE_SECRET')));
   const port = configService.get<number>('port');
-
-  if (configService.get<boolean>('testing')) {
-    app.use(
-      '/altair',
-      altairExpress({
-        endpointURL: '/api/graphql',
-        subscriptionsEndpoint: `ws://localhost:${port}/api/graphql`,
-      }),
-    );
-  }
-
+  app.use(
+    '/altair',
+    altairExpress({
+      endpointURL: '/api/graphql',
+    }),
+  );
   app.useGlobalPipes(new ValidationPipe());
   await app.listen(port);
 }

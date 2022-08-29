@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 import { Entity, Enum, OptionalProps, Property, Unique } from '@mikro-orm/core';
-import { Field, GraphQLTimestamp, ObjectType } from '@nestjs/graphql';
+import { Field, ObjectType } from '@nestjs/graphql';
 import {
   IsBoolean,
   IsDate,
@@ -108,12 +108,12 @@ export class UserEntity extends LocalBaseEntity implements IUser {
   @Min(1)
   public count: number = 1;
 
-  @Field(() => GraphQLTimestamp)
+  @Field(() => String)
   @Property()
   @IsDate()
   public lastLogin: Date = new Date();
 
-  @Field(() => GraphQLTimestamp)
+  @Field(() => String)
   @Property()
   @IsDate()
   public lastOnline: Date = new Date();

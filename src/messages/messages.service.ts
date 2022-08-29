@@ -58,6 +58,7 @@ export class MessagesService implements OnModuleInit {
     const expiration = profile.expiration();
     const message = await this.chatMessagesRepository.createEntity({
       chatId,
+      userId,
       body: this.encryptionService.encrypt(
         body,
         this.encryptionService.masterDecrypt(chat.chatKey),
@@ -80,8 +81,8 @@ export class MessagesService implements OnModuleInit {
     { chatId, messageId, body }: UpdateMessageInput,
   ): Promise<ChatMessageRedisEntity> {
     const profile = await this.chatsService.checkChatMembership(userId, chatId);
-    const chat = await this.chatsService.uncheckedChatById(chatId);
     const message = await this.messageByAuthor(profile.entityId, messageId);
+    const chat = await this.chatsService.uncheckedChatById(chatId);
     message.body = this.encryptionService.encrypt(
       body,
       this.encryptionService.masterDecrypt(chat.chatKey),
@@ -177,6 +178,24 @@ export class MessagesService implements OnModuleInit {
           this.chatMessagesRepository,
           message,
         );
+      }
+    }
+  }
+
+  public async deleteUserMessages(userId: string): Promise<void> {
+    const messages = await this.chatMessagesRepository
+      .search()
+      .where('userId')
+      .equals(userId)
+      .return.all();
+
+    if (messages.length > 0) {
+      for (const message of messages) {
+        await this.commonService.removeRedisEntity(
+          this.chatMessagesRepository,
+          message,
+        );
+        this.publishMessageChange(message, ChangeTypeEnum.DELETE);
       }
     }
   }

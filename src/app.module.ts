@@ -19,6 +19,7 @@ import { MikroOrmConfig } from './config/mikroorm.config';
 import { validationSchema } from './config/validation';
 import { EmailModule } from './email/email.module';
 import { EncryptionModule } from './encryption/encryption.module';
+import { InvitesModule } from './invites/invites.module';
 import { MessagesModule } from './messages/messages.module';
 import { PubsubModule } from './pubsub/pubsub.module';
 import { RedisClientModule } from './redis-client/redis-client.module';
@@ -45,7 +46,9 @@ import { UsersModule } from './users/users.module';
       useClass: GqlConfigService,
     }),
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'),
+      rootPath: join(__dirname, '..', 'client'),
+      renderPath: '*',
+      exclude: ['/api/*', '/altair/*'],
     }),
     UsersModule,
     CommonModule,
@@ -56,6 +59,7 @@ import { UsersModule } from './users/users.module';
     ChatsModule,
     MessagesModule,
     PubsubModule,
+    InvitesModule,
   ],
   providers: [
     {

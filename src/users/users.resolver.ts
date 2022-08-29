@@ -35,7 +35,7 @@ export class UsersResolver {
   }
 
   @Mutation(() => UserEntity)
-  public async updateProfileDescription(
+  public async updateAccountDescription(
     @CurrentUser() userId: string,
     @Args() dto: DescriptionDto,
   ): Promise<UserRedisEntity> {

@@ -13,7 +13,7 @@ export class EmailService {
   private readonly transport = createTransport(
     this.configService.get<IEmailConfig>('emailService'),
   );
-  private readonly email = `"Your App" <${this.configService.get<string>(
+  private readonly email = `"Ephemeral Chats" <${this.configService.get<string>(
     'EMAIL_USER',
   )}>`;
 

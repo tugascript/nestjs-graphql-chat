@@ -11,18 +11,19 @@ enum ChangeType {
 type Chat {
   author: User!
   chatType: ChatType!
-  createdAt: Timestamp!
-  endOfLife: Timestamp!
+  createdAt: String!
+  endOfLife: String!
   entityId: ID!
   expiration: Int!
-  invitation: String
+  invitation: String!
+  isMember: Boolean!
   messages(first: Int = 10): PaginatedMessages!
   name: String!
   profiles(first: Int = 10, nickname: String, order: QueryOrder = ASC): PaginatedProfiles!
   profilesCount: Int!
   slug: String!
   time: Int!
-  updatedAt: Timestamp!
+  updatedAt: String!
 }
 
 type ChatChange {
@@ -33,13 +34,13 @@ type ChatChange {
 type ChatMessage {
   body: String!
   chat: Chat!
-  createdAt: Timestamp!
-  endOfLife: Timestamp!
+  createdAt: String!
+  endOfLife: String!
   entityId: ID!
   expiration: Int!
   profile: Profile!
   time: Int!
-  updatedAt: Timestamp!
+  updatedAt: String!
 }
 
 type ChatMessageRedisEntityChangeEdge {
@@ -73,9 +74,47 @@ input CreateChatInput {
   time: Int!
 }
 
+input CreateInviteInput {
+  invitation: String!
+  recipientId: String!
+}
+
 input CreateMessageInput {
   body: String!
   chatId: String!
+}
+
+type Invite {
+  chat: Chat!
+  createdAt: String!
+  entityId: ID!
+  invitation: String!
+  recipient: User!
+  sender: User!
+  status: InviteStatus!
+  time: Int!
+  updatedAt: String!
+}
+
+type InviteChange {
+  edge: InviteRedisEntityChangeEdge!
+  type: ChangeType!
+}
+
+type InviteRedisEntityChangeEdge {
+  cursor: String!
+  node: Invite!
+}
+
+type InviteRedisEntityPageEdge {
+  cursor: String!
+  node: Invite!
+}
+
+enum InviteStatus {
+  ACCEPTED
+  DECLINED
+  PENDING
 }
 
 type Message {
@@ -89,20 +128,25 @@ type MessageChange {
 }
 
 type Mutation {
+  acceptInvite(invitation: String!): Invite!
   createChat(input: CreateChatInput!): Chat!
+  createInvite(input: CreateInviteInput!): Invite!
   createMessage(input: CreateMessageInput!): ChatMessage!
   createProfile(invitation: String!): Profile!
+  declineInvite(invitation: String!): Invite!
   deleteAccount(password: String!): Message!
+  deleteInvite(inviteId: String!): Message!
   leaveChat(chatId: String!): Message!
   removeChat(chatId: String!): Message!
   removeMessage(chatId: String!, messageId: String!): Message!
   removeProfile(chatId: String!, profileId: String!): Message!
+  updateAccountDescription(description: String!): User!
   updateChat(input: UpdateChatInput!): Chat!
   updateMessage(input: UpdateMessageInput!): ChatMessage!
   updateOnlineStatus(defaultStatus: OnlineStatus!): User!
   updateOwnNickname(input: UpdateNicknameInput!): Profile!
-  updateProfileDescription(description: String!): User!
   updateProfileNickname(input: UpdateProfileNicknameInput!): Profile!
+  updateRejectedInvite(invitation: String!): Invite!
 }
 
 enum OnlineStatus {
@@ -124,6 +168,13 @@ type PageInfo {
 type PaginatedChats {
   currentCount: Int!
   edges: [ChatRedisEntityPageEdge!]!
+  pageInfo: PageInfo!
+  previousCount: Int!
+}
+
+type PaginatedInvites {
+  currentCount: Int!
+  edges: [InviteRedisEntityPageEdge!]!
   pageInfo: PageInfo!
   previousCount: Int!
 }
@@ -151,14 +202,14 @@ type PaginatedUsers {
 
 type Profile {
   chat: Chat!
-  createdAt: Timestamp!
-  endOfLife: Timestamp!
+  createdAt: String!
+  endOfLife: String!
   entityId: ID!
   expiration: Int!
   nickname: String!
   slug: String!
   time: Int!
-  updatedAt: Timestamp!
+  updatedAt: String!
   user: User!
 }
 
@@ -183,12 +234,18 @@ type Query {
   chatBySlug(slug: String!): Chat!
   chatMessages(after: String, chatId: String!, first: Int = 10): PaginatedMessages!
   chatProfiles(after: String, chatId: String!, first: Int = 10, nickname: String): PaginatedProfiles!
+  inviteById(inviteId: String!): Invite!
+  inviteByInvitation(invitation: String!): Invite!
   me: User!
   memberChats: [Chat!]!
   messageById(chatId: String!, messageId: String!): ChatMessage!
   profileById(chatId: String!, profileId: String!): Profile!
   profileBySlug(chatId: String!, slug: String!): Profile!
   publicChats(after: String, cursor: QueryCursor = DATE, first: Int = 10, order: QueryOrder = DESC, search: String): PaginatedChats!
+  receivedInvites(after: String, first: Int = 10, status: InviteStatus): PaginatedInvites!
+  sentInviteById(inviteId: String!): Invite!
+  sentInviteByInvitation(invitation: String!): Invite!
+  sentInvites(after: String, first: Int = 10, status: InviteStatus): PaginatedInvites!
   userById(userId: String!): User!
   userByUsername(username: String!): User!
   userChats: [Chat!]!
@@ -207,14 +264,11 @@ enum QueryOrder {
 
 type Subscription {
   chatChange(chatId: String!): ChatChange!
+  inviteChange: InviteChange!
   messageChange(chatId: String!): MessageChange!
   profileChange(chatId: String!): ProfileChange!
+  publicChatChange: ChatChange!
 }
-
-"""
-`Date` type as integer. Type represents date and time as number of milliseconds from start of UNIX epoch.
-"""
-scalar Timestamp
 
 input UpdateChatInput {
   chatId: String!
@@ -240,16 +294,16 @@ input UpdateProfileNicknameInput {
 }
 
 type User {
-  createdAt: Timestamp!
+  createdAt: String!
   defaultStatus: String
   description: String
   email: String
   id: ID!
-  lastLogin: Timestamp!
-  lastOnline: Timestamp!
+  lastLogin: String!
+  lastOnline: String!
   name: String!
   onlineStatus: OnlineStatus!
-  updatedAt: Timestamp!
+  updatedAt: String!
   username: String!
 }
 

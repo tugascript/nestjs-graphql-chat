@@ -19,6 +19,7 @@ import { getQueryCursor } from '../common/enums/query-cursor.enum';
 import { QueryOrderEnum } from '../common/enums/query-order.enum';
 import { IPaginated } from '../common/interfaces/paginated.interface';
 import { EncryptionService } from '../encryption/encryption.service';
+import { InvitesService } from '../invites/invites.service';
 import { MessagesService } from '../messages/messages.service';
 import { PUB_SUB } from '../pubsub/pubsub.module';
 import { RedisClientService } from '../redis-client/redis-client.service';
@@ -38,6 +39,7 @@ import { UpdateNicknameInput } from './inputs/update-nickname.input';
 import { UpdateProfileNicknameInput } from './inputs/update-profile-nickname.input';
 import { IChatChange } from './interfaces/chat-change.interface';
 import { IProfileChange } from './interfaces/profile-change.interface';
+import { IPublicChatChange } from './interfaces/public-chat-change.interface';
 
 @Injectable()
 export class ChatsService implements OnModuleInit {
@@ -50,6 +52,7 @@ export class ChatsService implements OnModuleInit {
     private readonly encryptionService: EncryptionService,
     private readonly usersService: UsersService,
     private readonly messagesService: MessagesService,
+    private readonly invitesService: InvitesService,
     @Inject(PUB_SUB)
     private readonly pubsub: RedisPubSub,
   ) {
@@ -313,6 +316,7 @@ export class ChatsService implements OnModuleInit {
     await this.commonService.removeRedisEntity(this.chatsRepository, chat);
     await this.deleteProfiles(chatId);
     await this.messagesService.deleteChatMessages(chatId);
+    await this.invitesService.deleteChatInvites(chat.invitation);
     this.publishChatChange(chat, ChangeTypeEnum.DELETE);
     return new LocalMessageType('Chat deleted successfully');
   }
@@ -475,6 +479,39 @@ export class ChatsService implements OnModuleInit {
       .return.all();
   }
 
+  public async deleteUserChats(userId: string): Promise<void> {
+    const chats = await this.userChats(userId);
+
+    if (chats.length > 0) {
+      for (const chat of chats) {
+        await this.commonService.removeRedisEntity(this.chatsRepository, chat);
+        this.publishChatChange(chat, ChangeTypeEnum.DELETE);
+      }
+    }
+  }
+
+  public async userProfiles(userId: string): Promise<ProfileRedisEntity[]> {
+    return this.profilesRepository
+      .search()
+      .where('userId')
+      .equals(userId)
+      .return.all();
+  }
+
+  public async deleteUserProfiles(userId: string): Promise<void> {
+    const profiles = await this.userProfiles(userId);
+
+    if (profiles.length > 0) {
+      for (const profile of profiles) {
+        await this.commonService.removeRedisEntity(
+          this.profilesRepository,
+          profile,
+        );
+        this.publishProfileChange(profile, ChangeTypeEnum.DELETE);
+      }
+    }
+  }
+
   private async deleteProfiles(chatId: string): Promise<void> {
     const profiles = await this.profilesRepository
       .search()
@@ -488,6 +525,7 @@ export class ChatsService implements OnModuleInit {
           this.profilesRepository,
           profile,
         );
+        this.publishProfileChange(profile, ChangeTypeEnum.DELETE);
       }
     }
   }
@@ -535,13 +573,21 @@ export class ChatsService implements OnModuleInit {
     chat: ChatRedisEntity,
     notificationType: ChangeTypeEnum,
   ): void {
+    const change = this.commonService.generateChange(
+      chat,
+      notificationType,
+      'createdAt',
+    );
+
     this.pubsub.publish<IChatChange>(`CHAT_${chat.entityId.toUpperCase()}`, {
-      chatChange: this.commonService.generateChange(
-        chat,
-        notificationType,
-        'createdAt',
-      ),
+      chatChange: change,
     });
+
+    if (chat.chatType === ChatTypeEnum.PUBLIC) {
+      this.pubsub.publish<IPublicChatChange>('PUBLIC_CHAT', {
+        publicChatChange: change,
+      });
+    }
   }
 
   private publishProfileChange(

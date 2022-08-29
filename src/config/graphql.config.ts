@@ -1,17 +1,16 @@
-import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
+import { KeyvAdapter } from '@apollo/utils.keyvadapter';
+import { ApolloDriver } from '@nestjs/apollo';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GqlOptionsFactory } from '@nestjs/graphql';
-import { BaseRedisCache } from 'apollo-server-cache-redis';
-import responseCachePlugin from 'apollo-server-plugin-response-cache';
+import apolloResponseCache from 'apollo-server-plugin-response-cache';
 import { Context } from 'graphql-ws';
-import Redis, { RedisOptions } from 'ioredis';
+import Keyv from 'keyv';
 import { AuthService } from '../auth/auth.service';
 import { IExtra } from './interfaces/extra.interface';
 
 @Injectable()
 export class GqlConfigService implements GqlOptionsFactory {
-  private readonly redisOpt = this.configService.get<RedisOptions>('redis');
   private readonly testing = this.configService.get<boolean>('testing');
 
   constructor(
@@ -19,7 +18,7 @@ export class GqlConfigService implements GqlOptionsFactory {
     private readonly authService: AuthService,
   ) {}
 
-  public createGqlOptions(): ApolloDriverConfig {
+  public createGqlOptions(): any {
     return {
       driver: ApolloDriver,
       context: (all) => all,
@@ -29,14 +28,16 @@ export class GqlConfigService implements GqlOptionsFactory {
       sortSchema: true,
       bodyParserConfig: false,
       playground: this.testing,
-      plugins: [responseCachePlugin()],
+      plugins: [apolloResponseCache({})],
       cors: {
         origin: this.configService.get<string>('url'),
         credentials: true,
       },
-      cache: new BaseRedisCache({
-        client: new Redis(this.redisOpt),
-      }),
+      cache: new KeyvAdapter(
+        new Keyv(this.configService.get<string>('redisUrl'), {
+          ttl: this.configService.get<number>('ttl'),
+        }),
+      ),
       subscriptions: {
         'graphql-ws': {
           onConnect: async (

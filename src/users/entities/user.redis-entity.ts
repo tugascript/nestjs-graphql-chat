@@ -21,7 +21,7 @@ export class UserRedisEntity extends BaseRedisEntity implements IUser {
   public lastOnline: Date;
 
   public endOfLife(): number {
-    return getUnix(this.updatedAt) + this.time;
+    return getUnix(this.updatedAt) + 86400;
   }
 }
 

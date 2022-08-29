@@ -4,6 +4,7 @@ import { InjectRepository } from '@mikro-orm/nestjs';
 import {
   BadRequestException,
   CACHE_MANAGER,
+  forwardRef,
   Inject,
   Injectable,
   OnModuleInit,
@@ -17,12 +18,15 @@ import { v4 as uuidV4, v5 as uuidV5 } from 'uuid';
 import { RegisterDto } from '../auth/dtos/register.dto';
 import { ISessionsData } from '../auth/interfaces/sessions-data.interface';
 import { ITokenPayload } from '../auth/interfaces/token-payload.interface';
+import { ChatsService } from '../chats/chats.service';
 import { CommonService } from '../common/common.service';
 import { SearchDto } from '../common/dtos/search.dto';
 import { LocalMessageType } from '../common/entities/gql/message.type';
 import { getAfterCursor } from '../common/enums/after-cursor.enum';
 import { getUserQueryCursor } from '../common/enums/query-cursor.enum';
 import { IPaginated } from '../common/interfaces/paginated.interface';
+import { InvitesService } from '../invites/invites.service';
+import { MessagesService } from '../messages/messages.service';
 import { RedisClientService } from '../redis-client/redis-client.service';
 import { DescriptionDto } from './dtos/description.dto';
 import { OnlineStatusDto } from './dtos/online-status.dto';
@@ -42,6 +46,11 @@ export class UsersService implements OnModuleInit {
     private readonly usersRepository: EntityRepository<UserEntity>,
     private readonly commonService: CommonService,
     private readonly configService: ConfigService,
+    @Inject(forwardRef(() => ChatsService))
+    private readonly chatsService: ChatsService,
+    private readonly messagesService: MessagesService,
+    @Inject(forwardRef(() => InvitesService))
+    private readonly invitesService: InvitesService,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
   ) {
@@ -164,6 +173,10 @@ export class UsersService implements OnModuleInit {
         redisUser,
       );
 
+    await this.chatsService.deleteUserChats(userId);
+    await this.messagesService.deleteUserMessages(userId);
+    await this.chatsService.deleteUserProfiles(userId);
+    await this.invitesService.deleteUserInvites(userId);
     return new LocalMessageType('Account deleted successfully');
   }
 
@@ -358,7 +371,7 @@ export class UsersService implements OnModuleInit {
           redisUser[userKey] = user[userKey];
         }
       }
-
+      redisUser.time = 86400;
       await this.commonService.saveRedisEntity(
         this.usersRedisRepo,
         redisUser,

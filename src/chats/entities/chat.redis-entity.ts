@@ -34,7 +34,7 @@ export class ChatRedisEntity extends BaseRedisEntity {
   @IsEnum(ChatTypeEnum)
   public chatType: ChatTypeEnum;
 
-  @Field(() => String, { nullable: true })
+  @Field(() => String)
   @IsString()
   @IsUUID('4')
   public invitation: string;
