@@ -87,6 +87,9 @@ $ yarn start:dev
 $ yarn start:dev
 ```
 
+8. Finally go to http://locahost:4000/altair to test the API or go to http://localhost:4000/ to use the example React
+   Frontend.
+
 ## Deployment
 
 ### Steps:
@@ -138,6 +141,19 @@ $ dokku domains:set ephemeral-chats chats.your.domain.com
 $ dokku letsencrypt:enable ephemeral-chats
 $ dokku letsencrypt:cron-job --add 
 ```
+
+## Front-End Example
+
+To be easily accessible, I created a simple React front-end example that interacts with this API. I have to note that
+the front-end is not production ready, so it's not the best way to interact with the API, however I still made it the
+main url for the app.
+
+[Front-End Repo](https://github.com/tugascript/chat-frontend-example)
+
+## API Usages
+
+To check the API documentation and test the API itself just go to the /altair route, it uses
+the [Altair Graphql Client](https://altairgraphql.dev/) to debug and test the API.
 
 ## License
 
